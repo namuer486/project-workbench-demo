@@ -1,0 +1,2398 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>星港计划 · 知识管理库</title>
+<style>
+:root{
+  --bg:#f4f6fb;
+  --card:#ffffff;
+  --text:#1a2233;
+  --muted:#6b7280;
+  --border:#e7eaf3;
+  --primary:#4f6ef7;
+  --primary-soft:#eef1fe;
+  --primary-deep:#3b56d6;
+  --green:#16a34a; --green-soft:#e7f6ee;
+  --orange:#f59e0b; --orange-soft:#fef4e2;
+  --blue:#3b82f6; --blue-soft:#e8f1fe;
+  --red:#ef4444; --red-soft:#fdeaea;
+  --purple:#8b5cf6; --purple-soft:#f1ecfe;
+  --teal:#0d9488; --teal-soft:#e3f5f3;
+  --shadow:0 1px 3px rgba(23,32,74,.06),0 6px 18px rgba(23,32,74,.05);
+  --shadow-lg:0 10px 34px rgba(23,32,74,.12);
+  --radius:14px;
+  --sidebar-w:236px;
+  --mono:"SFMono-Regular",Consolas,"Liberation Mono",Menlo,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei","Hiragino Sans GB",sans-serif;
+  background:var(--bg);color:var(--text);font-size:14px;line-height:1.6;
+  -webkit-font-smoothing:antialiased;
+}
+a{color:var(--primary);text-decoration:none}
+button{font-family:inherit;cursor:pointer}
+
+/* ===== Layout ===== */
+.app{display:flex;height:100vh;overflow:hidden}
+.sidebar{
+  width:var(--sidebar-w);background:#111a33;color:#cbd5e1;flex-shrink:0;
+  display:flex;flex-direction:column;padding:20px 14px;
+}
+.brand{display:flex;align-items:center;gap:11px;padding:4px 8px 20px}
+.brand .logo{
+  width:38px;height:38px;border-radius:11px;flex-shrink:0;
+  background:linear-gradient(135deg,#4f6ef7,#8b5cf6);
+  display:flex;align-items:center;justify-content:center;font-size:20px;
+  box-shadow:0 4px 12px rgba(79,110,247,.45);
+}
+.brand .name{font-size:15px;font-weight:700;color:#fff;line-height:1.25}
+.brand .sub{font-size:11px;color:#7c8db0}
+.nav{display:flex;flex-direction:column;gap:3px;margin-top:4px}
+.nav-item{
+  display:flex;align-items:center;gap:11px;padding:11px 12px;border-radius:10px;
+  color:#aeb9d0;font-size:13.5px;cursor:pointer;transition:.15s;border:1px solid transparent;background:transparent;
+  text-align:left;width:100%;
+}
+.nav-item .ic{width:18px;text-align:center;font-size:16px;flex-shrink:0}
+.nav-item:hover{background:rgba(255,255,255,.06);color:#fff}
+.nav-item.active{background:linear-gradient(135deg,#4f6ef7,#5b6cf0);color:#fff;box-shadow:0 4px 14px rgba(79,110,247,.4)}
+.nav-group{margin-top:16px;padding:0 12px 6px;font-size:11px;letter-spacing:.06em;color:#5d6d8f;text-transform:uppercase}
+.sidebar .foot{margin-top:auto;padding:12px;font-size:11.5px;color:#64748b;line-height:1.6;border-top:1px solid rgba(255,255,255,.07)}
+.sidebar .foot .dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:#22c55e;margin-right:6px;box-shadow:0 0 0 3px rgba(34,197,94,.18)}
+
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0}
+.topbar{
+  height:60px;background:var(--card);border-bottom:1px solid var(--border);
+  display:flex;align-items:center;gap:16px;padding:0 24px;flex-shrink:0;
+}
+.topbar .title{font-size:17px;font-weight:700}
+.topbar .crumb{font-size:12.5px;color:var(--muted)}
+.topbar .spacer{flex:1}
+.search{
+  display:flex;align-items:center;gap:8px;background:var(--bg);border:1px solid var(--border);
+  border-radius:10px;padding:8px 13px;width:260px;transition:.15s;
+}
+.search:focus-within{border-color:var(--primary);background:#fff;box-shadow:0 0 0 3px var(--primary-soft)}
+.search input{border:none;outline:none;background:transparent;font-size:13px;width:100%;color:var(--text)}
+.topbar .today{font-size:12.5px;color:var(--muted);white-space:nowrap}
+
+.content{flex:1;overflow-y:auto;padding:24px}
+.view{display:none;animation:fade .25s ease}
+.view.active{display:block}
+@keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+/* ===== Cards & grids ===== */
+.grid{display:grid;gap:16px}
+.grid-4{grid-template-columns:repeat(4,1fr)}
+.grid-2{grid-template-columns:repeat(2,1fr)}
+.grid-3{grid-template-columns:repeat(3,1fr)}
+@media(max-width:1100px){.grid-4{grid-template-columns:repeat(2,1fr)}.grid-3{grid-template-columns:1fr}.grid-2{grid-template-columns:1fr}}
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:20px}
+.card h3{font-size:14.5px;font-weight:700;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.card h3 .tag{margin-left:auto;font-size:11px;font-weight:500;color:var(--muted);background:var(--bg);padding:2px 9px;border-radius:20px}
+.section-title{font-size:16px;font-weight:700;margin:4px 0 16px;display:flex;align-items:center;gap:10px}
+.section-title .bar{width:4px;height:18px;background:var(--primary);border-radius:2px}
+
+/* Stat cards */
+.stat{position:relative;overflow:hidden;padding:18px 20px}
+.stat .label{font-size:12.5px;color:var(--muted);margin-bottom:6px}
+.stat .value{font-size:30px;font-weight:800;letter-spacing:-.5px;line-height:1.1}
+.stat .unit{font-size:14px;font-weight:500;color:var(--muted);margin-left:2px}
+.stat .delta{font-size:12px;margin-top:8px;color:var(--muted)}
+.stat .ico{position:absolute;right:14px;top:14px;font-size:26px;opacity:.2}
+.stat::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--c,var(--primary))}
+.stat.blue{--c:var(--blue)}.stat.green{--c:var(--green)}.stat.orange{--c:var(--orange)}.stat.red{--c:var(--red)}
+
+/* ===== Chips & badges ===== */
+.chip{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:500;line-height:1.5;white-space:nowrap}
+.st-已解决{background:var(--green-soft);color:var(--green)}
+.st-待验证{background:var(--orange-soft);color:var(--orange)}
+.st-进行中{background:var(--blue-soft);color:var(--blue)}
+.st-未解决{background:var(--red-soft);color:var(--red)}
+.p-高{background:var(--red-soft);color:var(--red)}
+.p-中{background:var(--orange-soft);color:var(--orange)}
+.p-缺陷{background:#fde68a33;color:#b45309}
+.p-美术{background:var(--purple-soft);color:var(--purple)}
+.p-一般{background:var(--bg);color:var(--muted)}
+.cat-chip{background:var(--primary-soft);color:var(--primary-deep)}
+
+/* ===== Tables ===== */
+.table-wrap{overflow:auto;border:1px solid var(--border);border-radius:12px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+thead th{
+  position:sticky;top:0;background:#f8fafd;color:var(--muted);font-weight:600;text-align:left;
+  padding:11px 14px;border-bottom:1px solid var(--border);font-size:12px;white-space:nowrap;z-index:1;
+}
+tbody td{padding:11px 14px;border-bottom:1px solid var(--border);vertical-align:top}
+tbody tr:hover{background:#fafbfe}
+tbody tr:last-child td{border-bottom:none}
+.t-title{font-weight:600;max-width:340px}
+.t-sub{font-size:12px;color:var(--muted);margin-top:2px;max-width:380px}
+.mono{font-family:var(--mono);font-size:12px}
+
+/* ===== Forms ===== */
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:900px){.form-grid{grid-template-columns:1fr}}
+.field{display:flex;flex-direction:column;gap:6px}
+.field.full{grid-column:1/-1}
+.field label{font-size:12.5px;font-weight:600;color:var(--text)}
+.field label .req{color:var(--red)}
+.field input,.field select,.field textarea{
+  border:1px solid var(--border);border-radius:10px;padding:10px 12px;font-size:13.5px;
+  font-family:inherit;color:var(--text);background:#fff;transition:.15s;width:100%;
+}
+.field input:focus,.field select:focus,.field textarea:focus{
+  outline:none;border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-soft);
+}
+.field textarea{resize:vertical;min-height:88px}
+.field .hint{font-size:11.5px;color:var(--muted)}
+.radio-row{display:flex;gap:8px;flex-wrap:wrap}
+.radio-card{
+  flex:1;min-width:130px;border:1.5px solid var(--border);border-radius:11px;padding:12px 14px;
+  cursor:pointer;transition:.15s;background:#fff;text-align:center;
+}
+.radio-card input{display:none}
+.radio-card .rc-t{font-size:13.5px;font-weight:600;display:block}
+.radio-card .rc-d{font-size:11.5px;color:var(--muted);display:block;margin-top:3px}
+.radio-card:hover{border-color:#c7cff0}
+.radio-card.sel-resolved{border-color:var(--green);background:var(--green-soft)}
+.radio-card.sel-unresolved{border-color:var(--red);background:var(--red-soft)}
+
+/* ===== 畅游方法论四段式 ===== */
+.meth-group{margin-bottom:20px}
+.meth-group .mg-head{font-size:13.5px;font-weight:700;color:var(--primary-deep);margin-bottom:10px;display:flex;align-items:center;gap:8px}
+.meth-group .mg-step{
+  display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;
+  background:var(--primary);color:#fff;font-size:12px;font-weight:700;flex-shrink:0;
+}
+.meth-group .mg-sub{font-size:11.5px;color:var(--muted);font-weight:400}
+.meth-group .mg-body{border-left:3px solid var(--primary-soft);padding-left:14px;margin-left:3px}
+.meth-flow{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-bottom:16px}
+.meth-flow .fstep{background:var(--primary-soft);color:var(--primary-deep);font-weight:600;padding:3px 10px;border-radius:6px}
+.meth-flow .farrow{color:#c7cff0;font-weight:700}
+/* 详情弹窗四段式卡片 */
+.pd-sec{margin-bottom:16px}
+.pd-sec .pd-h{font-size:12px;font-weight:700;color:var(--primary-deep);margin-bottom:6px;display:flex;align-items:center;gap:6px}
+.pd-sec .pd-b{background:var(--bg);border-radius:10px;padding:10px 14px;font-size:13.5px;line-height:1.7}
+.pd-sec .pd-b.sol{background:var(--green-soft)}
+.ksf-list{list-style:none;padding:0;margin:0}
+.ksf-list li{padding:5px 0 5px 18px;position:relative;font-size:13px;line-height:1.6}
+.ksf-list li::before{content:"✓";position:absolute;left:0;color:var(--green);font-weight:700}
+
+/* ===== 压缩后问题条目 & 次级问题 ===== */
+.pain-item{
+  border:1px solid var(--border);border-radius:12px;padding:15px 18px;margin-bottom:12px;background:#fff;
+  transition:.15s;cursor:pointer;
+}
+.pain-item:hover{box-shadow:var(--shadow-lg);border-color:#c7cff0;transform:translateY(-1px)}
+.pain-item .pi-head{display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap}
+.pain-item .pi-no{width:44px;height:26px;border-radius:8px;background:var(--primary-soft);color:var(--primary-deep);font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.pain-item .pi-title{font-size:14.5px;font-weight:700;flex:1;min-width:200px}
+.pain-item .pi-stats{display:flex;gap:6px;flex-shrink:0}
+.pain-item .pi-desc{font-size:13px;color:var(--text);line-height:1.7;margin-bottom:10px}
+.pain-item .pi-keys{display:flex;flex-direction:column;gap:4px;margin-bottom:10px}
+.pain-item .pi-keys span{font-size:12px;color:var(--muted);padding-left:16px;position:relative;line-height:1.6}
+.pain-item .pi-keys span::before{content:"·";position:absolute;left:4px;color:var(--primary);font-weight:700}
+.pain-item .pi-foot{display:flex;align-items:center;gap:14px;font-size:12px;color:var(--muted);flex-wrap:wrap}
+.pain-item .pi-acts{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap}
+.pain-item .pi-btn{
+  font-size:12px;padding:5px 11px;border-radius:8px;border:1px solid var(--border);background:#fff;
+  color:var(--text);cursor:pointer;transition:.15s;font-weight:600;
+}
+.pain-item .pi-btn:hover{border-color:var(--primary);color:var(--primary);background:var(--primary-soft)}
+.pain-item .pi-btn.go{background:var(--primary-soft);border-color:#c7cff0;color:var(--primary-deep)}
+.pain-item.hl{border-color:var(--primary);box-shadow:0 0 0 3px rgba(79,110,247,.15)}
+.link-banner{
+  display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+  background:var(--primary-soft);border:1px solid #c7cff0;border-radius:11px;
+  padding:11px 16px;margin-bottom:14px;font-size:13px;color:var(--primary-deep);
+}
+.link-banner b{font-weight:700}
+.link-banner .lb-x{
+  margin-left:auto;font-size:12px;color:var(--muted);cursor:pointer;text-decoration:underline;background:none;border:none;
+}
+.tc-topic{
+  display:inline-flex;align-items:center;gap:4px;font-size:11.5px;padding:2px 8px;border-radius:999px;
+  background:var(--primary-soft);color:var(--primary-deep);cursor:pointer;border:1px solid #dbe2f8;
+}
+.tc-topic:hover{background:#e2e8fb}
+.pd-topics{display:flex;flex-wrap:wrap;gap:6px}
+
+/* ===== 六大衡量标签体系 ===== */
+.dim-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.dim-card{
+  border:1px solid var(--border);border-left:4px solid var(--dc);border-radius:12px;padding:13px 15px;background:#fff;
+  cursor:pointer;transition:.15s;
+}
+.dim-card:hover{box-shadow:var(--shadow-lg);transform:translateY(-2px)}
+.dim-card.on{box-shadow:0 0 0 2px var(--dc);border-color:var(--dc);background:var(--bg)}
+.dim-card .dc-head{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.dim-card .dc-key{font-size:14.5px;font-weight:700;flex:1}
+.dim-card .dc-rate{font-size:12px;font-weight:700;color:var(--dc);background:var(--bg);border-radius:999px;padding:2px 9px}
+.dim-card .dc-def{font-size:12px;color:var(--muted);line-height:1.55;min-height:34px}
+.dim-card .dc-meter{display:flex;height:7px;border-radius:4px;overflow:hidden;margin:9px 0 7px}
+.dim-card .dc-foot{display:flex;gap:10px;font-size:11.5px;color:var(--muted);flex-wrap:wrap}
+.dim-card .dc-foot b{color:var(--text)}
+.dim-chip{
+  display:inline-flex;align-items:center;gap:4px;font-size:11.5px;padding:2px 9px;border-radius:999px;
+  background:var(--dcs);color:var(--dc);cursor:pointer;border:1px solid transparent;font-weight:600;
+}
+.dim-chip:hover{border-color:var(--dc)}
+.dim-chip.on{background:var(--dc);color:#fff}
+.dim-pick{display:flex;flex-wrap:wrap;gap:8px}
+.dim-pick .dp{
+  display:inline-flex;align-items:center;gap:6px;font-size:13px;padding:7px 14px;border-radius:10px;
+  border:1px solid var(--border);background:#fff;cursor:pointer;transition:.15s;user-select:none;
+}
+.dim-pick .dp:hover{border-color:var(--dc)}
+.dim-pick .dp.on{background:var(--dcs);border-color:var(--dc);color:var(--dc);font-weight:700}
+
+/* ===== 用研问题定位图 ===== */
+.shot-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.shot-box{border:1px solid var(--border);border-radius:12px;overflow:hidden;background:#0f1424}
+.shot-head{display:flex;align-items:center;gap:8px;padding:9px 13px;background:#fafbfe;border-bottom:1px solid var(--border)}
+.shot-head .sh-t{font-size:13.5px;font-weight:700;color:var(--text)}
+.shot-head .sh-d{font-size:11.5px;color:var(--muted);margin-left:auto}
+.shot-canvas{position:relative;line-height:0}
+.shot-canvas img{width:100%;display:block}
+.shot-tag{
+  position:absolute;transform:translate(-50%,-50%);z-index:2;
+  font-size:11px;font-weight:700;padding:3px 9px;border-radius:999px;white-space:nowrap;cursor:pointer;
+  border:1.5px solid var(--dc);background:rgba(255,255,255,.94);color:var(--dc);box-shadow:0 2px 8px rgba(0,0,0,.28);
+  transition:.15s;
+}
+.shot-tag:hover{background:var(--dc);color:#fff;transform:translate(-50%,-50%) scale(1.06)}
+.shot-tag.spot{background:var(--dc);color:#fff}
+.shot-tag::before{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;background:currentColor;margin-right:5px;vertical-align:middle}
+.shot-legend{display:flex;flex-wrap:wrap;gap:8px;padding:9px 13px;background:#fafbfe;border-top:1px solid var(--border)}
+
+/* ===== 用研报告要点 ===== */
+.ur-concl{background:var(--green-soft);border:1px solid #cbe9cf;border-radius:11px;padding:12px 15px;font-size:13px;line-height:1.7;margin-bottom:14px}
+.ur-two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-bottom:14px}
+.ur-two .u2{border:1px solid var(--border);border-radius:11px;padding:11px 14px;font-size:12.5px;line-height:1.65}
+.ur-two .u2 b{display:block;margin-bottom:4px;font-size:13px}
+.ur-adv{border:1px solid var(--border);border-left:4px solid var(--dc);border-radius:10px;padding:11px 14px;margin-bottom:9px;background:#fff}
+.ur-adv .ua-h{display:flex;align-items:center;gap:8px;margin-bottom:5px;flex-wrap:wrap}
+.ur-adv .ua-n{width:22px;height:22px;border-radius:7px;background:var(--dcs);color:var(--dc);font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.ur-adv .ua-t{font-size:13.5px;font-weight:700}
+.ur-adv .ua-d{font-size:12.5px;color:var(--muted);line-height:1.7}
+@media(max-width:1100px){
+  .dim-grid,.shot-grid,.ur-two{grid-template-columns:1fr}
+}
+.defect-bar{display:flex;align-items:center;gap:12px;background:var(--red-soft);border:1px solid #f8d3d3;border-radius:12px;padding:14px 18px;margin-bottom:8px}
+.defect-bar .db-ico{font-size:22px}
+.defect-bar .db-t{font-size:13.5px;font-weight:700;color:#b91c1c}
+.defect-bar .db-d{font-size:12px;color:#7f1d1d;margin-top:2px}
+.defect-bar .db-n{margin-left:auto;font-size:24px;font-weight:800;color:#b91c1c;white-space:nowrap}
+.minor-toggle{
+  width:100%;display:flex;align-items:center;gap:10px;padding:15px 20px;
+  border:none;background:#fafbfe;font-size:13.5px;font-weight:600;color:var(--text);cursor:pointer;transition:.15s;
+}
+.minor-toggle:hover{background:#f3f5fa}
+.minor-toggle .arrow{transition:.2s;color:var(--muted)}
+.minor-toggle.open .arrow{transform:rotate(180deg)}
+
+/* ===== 版本大类 Tab ===== */
+.ver-tabs{display:flex;gap:8px;flex-wrap:wrap}
+.ver-tab{
+  display:inline-flex;align-items:center;gap:7px;padding:9px 15px;border-radius:10px;
+  border:1.5px solid var(--border);background:#fff;cursor:pointer;font-size:13px;font-weight:600;
+  color:var(--muted);transition:.15s;
+}
+.ver-tab:hover{border-color:#c7cff0;color:var(--text)}
+.ver-tab.on{background:var(--primary);border-color:var(--primary);color:#fff;box-shadow:0 4px 12px rgba(79,110,247,.3)}
+.ver-tab .vt-n{font-size:11.5px;background:rgba(0,0,0,.08);padding:1px 8px;border-radius:20px}
+.ver-tab.on .vt-n{background:rgba(255,255,255,.25)}
+.ver-tab.archive{border-style:dashed}
+.ver-tab.archive.on{background:#64748b;border-color:#64748b}
+/* ===== IPD 阶段横幅 ===== */
+.ipd-banner{
+  display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+  background:linear-gradient(135deg,#111a33,#25356e);color:#fff;border-radius:var(--radius);
+  padding:16px 22px;margin-bottom:16px;
+}
+.ipd-banner .ib-stage{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.ipd-banner .ib-step{font-size:12px;padding:4px 11px;border-radius:20px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.18);color:#aeb9d0}
+.ipd-banner .ib-step.done{color:#6ee7a0;border-color:rgba(110,231,160,.35)}
+.ipd-banner .ib-step.now{background:var(--primary);border-color:var(--primary);color:#fff;font-weight:700}
+.ipd-banner .ib-arrow{color:rgba(255,255,255,.3)}
+.ipd-banner .ib-ksf{font-size:12px;color:#aeb9d0;margin-left:auto;text-align:right;line-height:1.5}
+.ipd-banner .ib-ksf b{color:#fff}
+/* 分组小标题（每周总览版本分组） */
+.week-group-title{width:100%;font-size:12px;font-weight:700;color:var(--muted);margin:8px 0 2px;display:flex;align-items:center;gap:8px}
+.week-group-title::after{content:"";flex:1;height:1px;background:var(--border)}
+.ver-badge{display:inline-flex;align-items:center;gap:4px;font-size:10.5px;font-weight:600;padding:1px 7px;border-radius:20px;white-space:nowrap}
+.ver-badge.v20dev{background:var(--blue-soft);color:var(--blue)}
+.ver-badge.v20trans{background:var(--green-soft);color:var(--green)}
+.ver-badge.v10{background:#f1f5f9;color:#64748b}
+.ver-head{display:flex;align-items:center;gap:10px;padding:14px 20px;border-bottom:1px solid var(--border);flex-wrap:wrap}
+.ver-head.v3{background:linear-gradient(90deg,#e8f5f2,#fff)}
+.ver-head .vh-badge{font-size:14px;font-weight:700;color:var(--teal)}
+.ver-head .vh-sub{font-size:12px;color:var(--muted)}
+.ver-head .vh-count{margin-left:auto;font-size:12.5px;font-weight:700;color:var(--teal);background:#fff;border:1px solid var(--border);padding:3px 12px;border-radius:20px}
+
+/* ===== Buttons ===== */
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:7px;
+  border:1px solid var(--border);background:#fff;color:var(--text);border-radius:10px;
+  padding:9px 16px;font-size:13.5px;font-weight:600;transition:.15s;
+}
+.btn:hover{background:#f7f8fc}
+.btn.primary{background:var(--primary);border-color:var(--primary);color:#fff;box-shadow:0 4px 12px rgba(79,110,247,.3)}
+.btn.primary:hover{background:var(--primary-deep)}
+.btn.ghost{background:transparent;border-color:var(--border)}
+.btn.sm{padding:6px 11px;font-size:12.5px;border-radius:8px}
+.btn.danger{color:var(--red)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn-row{display:flex;gap:10px;margin-top:18px;flex-wrap:wrap}
+
+/* ===== Empty / toast / modal ===== */
+.empty{text-align:center;padding:46px 20px;color:var(--muted)}
+.empty .e-ico{font-size:42px;margin-bottom:12px;opacity:.5}
+.toast{
+  position:fixed;bottom:26px;left:50%;transform:translateX(-50%) translateY(20px);
+  background:#111a33;color:#fff;padding:11px 20px;border-radius:11px;font-size:13.5px;
+  opacity:0;pointer-events:none;transition:.25s;z-index:999;box-shadow:var(--shadow-lg);max-width:80vw;
+}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.toast.ok{background:#14532d}
+.toast.err{background:#7f1d1d}
+.modal-mask{
+  position:fixed;inset:0;background:rgba(15,23,42,.45);backdrop-filter:blur(3px);
+  display:none;align-items:center;justify-content:center;z-index:900;padding:20px;
+}
+.modal-mask.show{display:flex}
+.modal{background:#fff;border-radius:16px;box-shadow:var(--shadow-lg);max-width:560px;width:100%;padding:24px;max-height:90vh;overflow:auto;animation:fade .2s}
+
+/* ===== Dashboard specifics ===== */
+.legend{display:flex;flex-wrap:wrap;gap:8px 16px;margin-top:12px}
+.legend .lg{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)}
+.legend .sw{width:10px;height:10px;border-radius:3px}
+.chart-box{display:flex;align-items:center;justify-content:center;min-height:220px}
+.bar-row{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.bar-row .b-label{width:110px;text-align:right;font-size:12px;color:var(--muted);flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bar-row .b-track{flex:1;background:var(--bg);border-radius:6px;height:22px;overflow:hidden;position:relative}
+.bar-row .b-fill{height:100%;border-radius:6px;transition:width .5s ease;display:flex;align-items:center;justify-content:flex-end;padding-right:7px;font-size:11px;color:#fff;font-weight:600;min-width:24px}
+.bar-row .b-val{width:34px;font-size:12px;color:var(--text);font-weight:600}
+
+/* ===== Weekly ===== */
+.week-pill{display:inline-flex;align-items:center;gap:8px;padding:9px 15px;border-radius:11px;border:1.5px solid var(--border);cursor:pointer;font-size:13px;background:#fff;transition:.15s;flex-wrap:wrap}
+.week-pill:hover{border-color:#c7cff0}
+.week-pill.on{background:var(--primary);border-color:var(--primary);color:#fff;box-shadow:0 4px 12px rgba(79,110,247,.3)}
+.week-pill .w-badge{font-size:11px;font-weight:700;background:var(--primary-soft);color:var(--primary-deep);padding:1px 8px;border-radius:20px}
+.week-pill.on .w-badge{background:rgba(255,255,255,.25);color:#fff}
+.meet-list{list-style:none;margin-top:4px}
+.meet-list li{padding:9px 0;border-bottom:1px dashed var(--border);display:flex;gap:9px;font-size:13px}
+.meet-list li:last-child{border-bottom:none}
+.meet-list .mk{flex-shrink:0;color:var(--primary);font-weight:700}
+
+/* ===== Graph ===== */
+.graph-toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+.graph-canvas-wrap{position:relative;border:1px solid var(--border);border-radius:var(--radius);background:
+  radial-gradient(circle at 1px 1px,#e6e9f2 1px,transparent 0) 0 0/22px 22px,#fff;
+  overflow:hidden;height:640px;cursor:grab}
+#graphCanvas{display:block;touch-action:none}
+.graph-canvas-wrap.dragging{cursor:grabbing}
+.graph-tip{position:absolute;left:12px;top:12px;background:#fff;border:1px solid var(--border);border-radius:10px;padding:8px 12px;font-size:12px;color:var(--muted);box-shadow:var(--shadow);pointer-events:none}
+.node-tip{
+  position:absolute;pointer-events:none;background:#111a33;color:#fff;border-radius:10px;
+  padding:10px 13px;font-size:12px;max-width:300px;box-shadow:var(--shadow-lg);display:none;z-index:5;line-height:1.5;
+}
+.node-tip .nt-t{font-weight:700;margin-bottom:3px}
+.node-tip .nt-m{color:#cbd5e1}
+
+/* ===== AI ===== */
+.ai-banner{background:linear-gradient(135deg,#111a33,#25356e);color:#fff;border-radius:var(--radius);padding:26px;position:relative;overflow:hidden}
+.ai-banner::after{content:"";position:absolute;right:-40px;top:-40px;width:200px;height:200px;border-radius:50%;background:radial-gradient(circle,rgba(139,92,246,.4),transparent 70%)}
+.ai-banner h2{font-size:20px;margin-bottom:8px}
+.ai-banner p{color:#aeb9d0;font-size:13.5px;max-width:640px}
+.ai-banner .badges{display:flex;gap:8px;margin-top:16px;flex-wrap:wrap}
+.ai-banner .b{font-size:11.5px;padding:5px 12px;border-radius:20px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.18)}
+.code-block{background:#0f172a;color:#dbe4f5;border-radius:11px;padding:16px;font-family:var(--mono);font-size:12px;overflow:auto;line-height:1.7;white-space:pre}
+.api-item{display:flex;gap:12px;padding:14px 0;border-bottom:1px dashed var(--border)}
+.api-item:last-child{border-bottom:none}
+.api-item .m{font-family:var(--mono);font-size:11px;font-weight:700;color:#fff;background:var(--methodC,var(--primary));padding:2px 8px;border-radius:6px;height:fit-content;white-space:nowrap}
+.api-item .d{flex:1}
+.api-item .d .an{font-weight:700;font-family:var(--mono);font-size:13px}
+.api-item .d .ad{font-size:12.5px;color:var(--muted);margin-top:3px}
+
+/* ===== 横向时间轴 ===== */
+.timeline-scroll{overflow-x:auto;overflow-y:hidden;padding:8px 4px 16px}
+.timeline-scroll::-webkit-scrollbar{height:8px}
+.timeline-scroll::-webkit-scrollbar-thumb{background:#d5dbea;border-radius:4px}
+.timeline-track{
+  position:relative;display:flex;min-width:max-content;padding:28px 26px;
+}
+.timeline-track::before{
+  content:"";position:absolute;left:0;right:0;top:50%;
+  height:3px;transform:translateY(-50%);
+  background:linear-gradient(90deg,transparent,#c9d2e6 4%,#c9d2e6 96%,transparent);
+}
+.tl-node{
+  position:relative;width:280px;flex:0 0 280px;
+  display:grid;grid-template-rows:1fr auto 1fr;align-items:center;justify-items:center;
+}
+.tl-node .tl-slot{width:100%;display:flex;flex-direction:column}
+.tl-node .tl-slot.top{justify-content:flex-end;align-self:end}
+.tl-node .tl-slot.bottom{justify-content:flex-start;align-self:start}
+.tl-node .tl-dot{
+  width:18px;height:18px;border-radius:50%;border:3px solid #fff;z-index:2;
+  background:var(--dot,#94a3b8);box-shadow:0 0 0 2px var(--dot,#94a3b8),0 2px 6px rgba(0,0,0,.15);
+}
+.tl-card{
+  width:100%;background:#fff;border:1px solid var(--border);border-radius:12px;
+  padding:13px 14px;cursor:pointer;transition:.16s;box-shadow:var(--shadow);
+  position:relative;
+}
+.tl-card:hover{transform:translateY(-3px);box-shadow:var(--shadow-lg);border-color:#c7cff0}
+.tl-card .tc-date{font-size:11px;color:var(--muted);font-family:var(--mono);margin-bottom:5px}
+.tl-card .tc-title{font-size:13px;font-weight:700;line-height:1.45;margin-bottom:8px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.tl-card .tc-tags{display:flex;gap:5px;flex-wrap:wrap}
+.tl-card .tc-sol{font-size:11.5px;color:var(--muted);margin-top:8px;line-height:1.5;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.tl-card .tc-sol b{color:var(--green);font-weight:600}
+.tl-connector{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:calc(100% + 0px);height:3px;z-index:1}
+
+/* responsive */
+@media(max-width:820px){
+  .sidebar{width:66px;padding:16px 8px}
+  .brand .name,.brand .sub,.nav-item span,.nav-group,.sidebar .foot{display:none}
+  .nav-item{justify-content:center}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="logo">🫧</div>
+      <div>
+        <div class="name">星港计划</div>
+        <div class="sub">知识管理库 · NEBULA</div>
+      </div>
+    </div>
+    <div class="nav-group">核心</div>
+    <nav class="nav">
+      <button class="nav-item active" data-view="insight"><span class="ic">🎯</span><span>项目提炼</span></button>
+      <button class="nav-item" data-view="timeline"><span class="ic">🕐</span><span>项目问题时间轴</span></button>
+      <button class="nav-item" data-view="daily"><span class="ic">📝</span><span>项目问题提交</span></button>
+    </nav>
+    <div class="nav-group">过程</div>
+    <nav class="nav">
+      <button class="nav-item" data-view="weekly"><span class="ic">🗓️</span><span>每周问题总览</span></button>
+      <button class="nav-item" data-view="graph"><span class="ic">🕸️</span><span>问题方案图谱</span></button>
+    </nav>
+    <div class="nav-group">综合</div>
+    <nav class="nav">
+      <button class="nav-item" data-view="dashboard"><span class="ic">📊</span><span>数据洞察</span></button>
+      <button class="nav-item" data-view="ai"><span class="ic">🤖</span><span>AI 接入接口</span></button>
+    </nav>
+    <div class="foot">
+      <div><span class="dot"></span>数据本地持久化</div>
+      <div style="margin-top:4px">v2.0 核心玩法 · 2026</div>
+    </div>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <div>
+        <div class="title" id="viewTitle">数据分析仪表盘</div>
+        <div class="crumb">星港计划（代号 NEBULA）· 2.0 核心玩法版本 · 示例数据</div>
+      </div>
+      <div class="spacer"></div>
+      <div class="search">
+        <span>🔍</span>
+        <input id="globalSearch" placeholder="搜索问题、方案、负责人…" />
+      </div>
+      <div class="today" id="todayLabel"></div>
+    </header>
+
+    <div class="content">
+      <!-- ============ 项目提炼（最高优先级 · 与时间轴联动） ============ -->
+      <section class="view active" id="view-insight">
+        <div class="ipd-banner">
+          <div>
+            <div style="font-size:12px;color:#aeb9d0;margin-bottom:6px">📍 IPD 阶段定位 · 畅游方法论</div>
+            <div class="ib-stage">
+              <span class="ib-step done">概念 ✓</span><span class="ib-arrow">→</span>
+              <span class="ib-step done">立项 ✓</span><span class="ib-arrow">→</span>
+              <span class="ib-step done">核心玩法 ✓</span><span class="ib-arrow">→</span>
+              <span class="ib-step done">核心功能 ✓</span><span class="ib-arrow">→</span>
+              <span class="ib-step done">全功能 ✓（2.0 核心玩法已冻结）</span><span class="ib-arrow">→</span>
+              <span class="ib-step now">3.0 预备 · 当前</span><span class="ib-arrow">→</span>
+              <span class="ib-step">3.0 概念/立项</span>
+            </div>
+          </div>
+          <div class="ib-ksf">
+            KSF 重点：2.0 经验沉淀归档 · <b>3.0 概念验证与预备任务推进</b><br>
+            长线运营：新增 / 现有 / 回流用户的 <b>吸量 · 留存 · 付费</b>
+          </div>
+        </div>
+        <div class="grid grid-4" id="insightStats" style="margin-bottom:16px"></div>
+        <div class="card" style="margin-bottom:16px">
+          <h3>🏷️ 六大衡量标签体系 <span class="tag" id="dimTag"></span></h3>
+          <div class="dim-grid" id="dimCards"></div>
+        </div>
+        <div class="card" style="margin-bottom:16px">
+          <h3>🎯 通用性总结条目 <span class="tag" id="painTag"></span>
+            <span class="tag" id="dimFilterTag" style="display:none"></span>
+          </h3>
+          <div id="dimBanner" class="link-banner" style="display:none"></div>
+          <div id="painList"></div>
+          <div id="defectSummary" style="margin-top:16px"></div>
+        </div>
+        <div class="card" style="margin-bottom:16px">
+          <h3>📌 用研问题定位图 <span class="tag">标签与画面位置一一对应 · 点击标签看详情</span></h3>
+          <div class="shot-grid" id="urShots"></div>
+        </div>
+        <div class="card">
+          <h3>📄 用研测试报告要点 <span class="tag" id="urTag"></span></h3>
+          <div id="urReport"></div>
+        </div>
+      </section>
+
+      <!-- ============ 数据洞察（数据分析仪表盘 + 全部问题库） ============ -->
+      <section class="view" id="view-dashboard">
+        <div class="grid grid-4" id="statCards" style="margin-bottom:16px"></div>
+        <div class="card" style="margin-bottom:16px">
+          <h3>版本阶段概览</h3>
+          <div id="versionSummary"></div>
+        </div>
+        <div class="grid grid-2" style="margin-bottom:16px">
+          <div class="card">
+            <h3>问题状态分布 <span class="tag">全量</span></h3>
+            <div class="chart-box" id="donutStatus"></div>
+            <div class="legend" id="legendStatus"></div>
+          </div>
+          <div class="card">
+            <h3>六大衡量标签分布 <span class="tag">与图谱 / 项目提炼口径一致</span></h3>
+            <div id="barDimension"></div>
+          </div>
+        </div>
+        <div class="card" style="margin-bottom:14px;padding:14px 20px">
+          <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+            <select id="libStatus" style="border:1px solid var(--border);border-radius:9px;padding:8px 12px;font-size:13px;background:#fff">
+              <option value="">全部状态</option>
+              <option>已解决</option><option>待验证</option><option>进行中</option><option>未解决</option>
+            </select>
+            <select id="libCategory" style="border:1px solid var(--border);border-radius:9px;padding:8px 12px;font-size:13px;background:#fff">
+              <option value="">全部分类</option>
+            </select>
+            <select id="libDim" style="border:1px solid var(--border);border-radius:9px;padding:8px 12px;font-size:13px;background:#fff">
+              <option value="">全部衡量标签</option>
+            </select>
+            <select id="libPriority" style="border:1px solid var(--border);border-radius:9px;padding:8px 12px;font-size:13px;background:#fff">
+              <option value="">全部优先级</option>
+              <option>高</option><option>中</option><option>缺陷</option><option>美术</option><option>一般</option>
+            </select>
+            <span id="libVerHint" style="font-size:12px;color:var(--muted)">按版本大类分区：3.0 预备优先 · 2.0 已结束归档折叠</span>
+          </div>
+        </div>
+        <div class="card" style="padding:0">
+          <div class="ver-head v3">
+            <span class="vh-badge">🚀 3.0 预备任务</span>
+            <span class="vh-sub">过渡期暂定任务 · 当前优先处理</span>
+            <span class="vh-count" id="v3Count"></span>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr>
+                <th style="width:70px">编号</th><th>问题</th><th style="width:110px">分类</th>
+                <th style="width:90px">优先级</th><th style="width:90px">状态</th><th style="width:110px">负责人</th><th style="width:60px"></th>
+              </tr></thead>
+              <tbody id="libBody"></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="card" style="padding:0;margin-top:16px;overflow:hidden">
+          <button class="minor-toggle" id="archiveToggle">
+            <span>📦 2.0 版本归档 <span style="font-weight:400;color:var(--muted);font-size:12px">（07/06 - 08/31 · 已结束）</span></span>
+            <span class="chip" style="background:var(--bg);color:var(--muted)" id="archiveCount"></span>
+            <span class="arrow" id="archiveArrow">▾</span>
+          </button>
+          <div id="archiveList" style="display:none">
+            <div class="table-wrap" style="border:none;border-top:1px solid var(--border);border-radius:0">
+              <table>
+                <thead><tr>
+                  <th style="width:70px">编号</th><th>问题</th><th style="width:110px">分类</th>
+                  <th style="width:90px">优先级</th><th style="width:90px">状态</th><th style="width:110px">负责人</th><th style="width:60px"></th>
+                </tr></thead>
+                <tbody id="archiveBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+        <div class="card" style="padding:0;margin-top:16px;overflow:hidden">
+          <button class="minor-toggle" id="minorToggle">
+            <span>🗂️ 次级问题 · 关联分析库 <span style="font-weight:400;color:var(--muted);font-size:12px">（一次性 / 无通用性条目）</span></span>
+            <span class="chip" style="background:var(--bg);color:var(--muted)" id="minorToggleCount"></span>
+            <span class="arrow" id="minorArrow">▾</span>
+          </button>
+          <div id="minorList" style="display:none">
+            <div class="table-wrap" style="border:none;border-top:1px solid var(--border);border-radius:0">
+              <table>
+                <thead><tr>
+                  <th style="width:70px">编号</th><th>问题</th><th style="width:110px">分类</th>
+                  <th style="width:90px">优先级</th><th style="width:90px">状态</th><th style="width:110px">负责人</th><th style="width:60px"></th>
+                </tr></thead>
+                <tbody id="minorBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ 项目问题时间轴 ============ -->
+      <section class="view" id="view-timeline">
+        <div id="tlLinkBar" class="link-banner" style="display:none"></div>
+        <div class="card" style="margin-bottom:16px;padding:16px 20px">
+          <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+            <div style="font-size:13.5px;color:var(--muted)">筛选：</div>
+            <select id="tlVersion" style="border:1px solid var(--border);border-radius:9px;padding:8px 12px;font-size:13px;background:#fff">
+              <option value="">全部版本</option>
+              <option value="v3.0">🚀 3.0 预备（优先）</option>
+              <option value="v2.0">📦 2.0 归档</option>
+            </select>
+            <select id="tlStatus" style="border:1px solid var(--border);border-radius:9px;padding:8px 12px;font-size:13px;background:#fff">
+              <option value="">全部状态</option>
+              <option>已解决</option><option>进行中</option><option>未解决</option>
+            </select>
+            <select id="tlCategory" style="border:1px solid var(--border);border-radius:9px;padding:8px 12px;font-size:13px;background:#fff">
+              <option value="">全部分类</option>
+            </select>
+            <div class="spacer" style="flex:1"></div>
+            <span class="chip cat-chip" id="tlCount"></span>
+          </div>
+        </div>
+        <div class="card">
+          <h3>🕐 项目问题 · 解决方案时间轴 <span class="tag">目标 → KSF → 方案 → 复盘</span></h3>
+          <div class="meth-flow">
+            <span class="fstep">🎯 正确的目标</span><span class="farrow">→</span>
+            <span class="fstep">🔑 关键成功要素</span><span class="farrow">→</span>
+            <span class="fstep">💡 解决方案</span><span class="farrow">→</span>
+            <span class="fstep">🔄 复盘反思</span>
+            <span style="margin-left:8px;color:var(--muted)">点击节点卡片查看完整四段式</span>
+          </div>
+          <div class="timeline-scroll" id="timelineScroll">
+            <div class="timeline-track" id="timelineTrack"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ 项目问题提交 ============ -->
+      <section class="view" id="view-daily">
+        <div class="grid" style="grid-template-columns:1.15fr 1fr;gap:16px" id="dailyGrid">
+          <div class="card">
+            <h3>📝 提交项目问题 · 解决方案</h3>
+            <div class="meth-flow">
+              <span class="fstep">🎯 正确的目标</span><span class="farrow">→</span>
+              <span class="fstep">🔑 KSF</span><span class="farrow">→</span>
+              <span class="fstep">💡 解决方案</span><span class="farrow">→</span>
+              <span class="fstep">🔄 复盘反思</span>
+            </div>
+            <div class="form-grid" id="dailyForm">
+              <div class="meth-group full">
+                <div class="mg-head"><span class="mg-step">1</span>正确的目标 <span class="mg-sub">厘清这个事项真正要达成的成果</span></div>
+                <div class="mg-body">
+                  <div class="form-grid">
+                    <div class="field full">
+                      <label>事项标题 <span class="req">*</span></label>
+                      <input id="fTitle" placeholder="一句话概括，例如：无尽模式性能瓶颈" />
+                    </div>
+                    <div class="field full">
+                      <label>目标成果 <span class="req">*</span></label>
+                      <textarea id="fGoal" placeholder="要交付的成果是什么？尽量量化 / 可验证，例如：保障体验测试流畅运行、消除卡顿"></textarea>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="meth-group full">
+                <div class="mg-head"><span class="mg-step">2</span>关键成功要素 KSF <span class="mg-sub">达成目标的关键点，每行一条</span></div>
+                <div class="mg-body">
+                  <div class="field full">
+                    <textarea id="fKsf" placeholder="例：&#10;程序全力性能优化&#10;缺失资源落实到位&#10;无尽模式流畅度达标"></textarea>
+                  </div>
+                </div>
+              </div>
+              <div class="meth-group full">
+                <div class="mg-head"><span class="mg-step">3</span>解决方案 <span class="mg-sub">基于 KSF 制定，多套备选优中选优</span></div>
+                <div class="mg-body">
+                  <div class="field full">
+                    <textarea id="fSolution" placeholder="描述具体解决方案，可写多套备选并标注优选方案"></textarea>
+                  </div>
+                </div>
+              </div>
+              <div class="meth-group full">
+                <div class="mg-head"><span class="mg-step">4</span>复盘反思 <span class="mg-sub">验证方式 + 复盘节点</span></div>
+                <div class="mg-body">
+                  <div class="field full">
+                    <textarea id="fReview" placeholder="如何验证成果达成？何时复盘？为后续优化沉淀什么？"></textarea>
+                  </div>
+                </div>
+              </div>
+              <div class="field">
+                <label>事项分类</label>
+                <select id="fCategory"></select>
+              </div>
+              <div class="field">
+                <label>严重程度</label>
+                <select id="fSeverity">
+                  <option value="高">高</option>
+                  <option value="中" selected>中</option>
+                  <option value="低">低</option>
+                </select>
+              </div>
+              <div class="field">
+                <label>提出日期</label>
+                <input type="date" id="fDate" />
+              </div>
+              <div class="field">
+                <label>来源</label>
+                <input id="fSource" placeholder="如：周会 / 跑测 / 复盘" />
+              </div>
+              <div class="field full">
+                <label>衡量标签（六大项 · 可多选）<span class="req">*</span></label>
+                <div class="dim-pick" id="fDims"></div>
+                <div class="hint" id="fDimHint" style="font-size:11.5px;color:var(--muted);margin-top:6px">
+                  标签口径来自用研报告：新鲜感 / 目标感 / 成长感 / 乐趣性 / 社交感 / 时间成本
+                </div>
+              </div>
+              <div class="field full">
+                <label>解决状态 <span class="req">*</span></label>
+                <div class="radio-row">
+                  <label class="radio-card sel-unresolved" id="rcUnresolved">
+                    <input type="radio" name="status" value="未解决" checked>
+                    <span class="rc-t">🔴 未解决</span>
+                    <span class="rc-d">方案未定，可后续补交</span>
+                  </label>
+                  <label class="radio-card" id="rcResolved">
+                    <input type="radio" name="status" value="已解决">
+                    <span class="rc-t">🟢 已解决</span>
+                    <span class="rc-d">方案已落地</span>
+                  </label>
+                </div>
+              </div>
+              <div class="field full">
+                <div class="btn-row" style="margin-top:0">
+                  <button class="btn primary" id="btnSubmit">✅ 提交记录</button>
+                  <button class="btn ghost" id="btnReset">清空重填</button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="card">
+            <h3>🗒️ 我的提交记录 <span class="tag" id="myCount">0 条</span></h3>
+            <div id="mySubmissions"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ 每周总览 ============ -->
+      <section class="view" id="view-weekly">
+        <div class="card" style="margin-bottom:16px">
+          <h3>选择周次</h3>
+          <div style="display:flex;gap:8px;flex-wrap:wrap" id="weekSelector"></div>
+        </div>
+        <div id="weeklyBody"></div>
+      </section>
+
+      <!-- ============ 网络图谱 ============ -->
+      <section class="view" id="view-graph">
+        <div class="card">
+          <div class="graph-toolbar">
+            <select id="graphVersion" style="border:1px solid var(--border);border-radius:9px;padding:8px 12px;font-size:13px;background:#fff">
+              <option value="v3.0">🚀 仅 3.0 预备（优先）</option>
+              <option value="all">全部版本</option>
+              <option value="v2.0">📦 仅 2.0 归档</option>
+            </select>
+            <select id="graphDimension" style="border:1px solid var(--border);border-radius:9px;padding:8px 12px;font-size:13px;background:#fff">
+              <option value="all">全部衡量标签</option>
+            </select>
+            <select id="graphOwner" style="border:1px solid var(--border);border-radius:9px;padding:8px 12px;font-size:13px;background:#fff">
+              <option value="all">全部负责人</option>
+            </select>
+            <select id="graphLayout" style="border:1px solid var(--border);border-radius:9px;padding:8px 12px;font-size:13px;background:#fff">
+              <option value="force">力导向布局</option>
+              <option value="radial">径向布局</option>
+            </select>
+            <button class="btn sm" id="btnGraphFit">⤢ 重置视图</button>
+            <div class="legend">
+              <span class="lg"><span class="sw" style="background:var(--purple)"></span>衡量标签（六维）</span>
+              <span class="lg"><span class="sw" style="background:var(--teal)"></span>负责人</span>
+              <span class="lg"><span class="sw" style="background:#cbd5e1"></span>高价值问题</span>
+              <span class="lg"><span class="sw" style="background:var(--green)"></span>解决方案</span>
+            </div>
+          </div>
+          <div class="graph-canvas-wrap" id="graphWrap">
+            <canvas id="graphCanvas"></canvas>
+            <div class="graph-tip">分类口径已统一为六大衡量标签（新鲜感/目标感/成长感/乐趣性/社交感/时间成本）· 默认仅 3.0 预备 · 滚轮缩放 · 拖拽节点 · 悬停查看详情</div>
+            <div class="node-tip" id="nodeTip"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ AI 接入 ============ -->
+      <section class="view" id="view-ai">
+        <div class="ai-banner" style="margin-bottom:16px">
+          <h2>🤖 AI 接入接口已预留</h2>
+          <p>本知识库内置标准化的 AI 桥接接口（<code style="font-family:var(--mono)">window.KnowledgeBaseAI</code>），
+          后续可接入大模型 / Agent 自动完成问题录入、方案补全、周报生成与知识图谱更新。</p>
+          <div class="badges">
+            <span class="b">🟢 前端桥接已就绪</span>
+            <span class="b">🔌 REST 接口预留</span>
+            <span class="b">🧠 可配置模型端点</span>
+            <span class="b">💾 数据本地持久化</span>
+          </div>
+        </div>
+
+        <div class="grid grid-2" style="margin-bottom:16px">
+          <div class="card">
+            <h3>AI 服务配置</h3>
+            <div class="form-grid">
+              <div class="field full">
+                <label>接口端点 Endpoint</label>
+                <input id="aiEndpoint" placeholder="https://your-ai-service.com/v1/kb" />
+              </div>
+              <div class="field">
+                <label>API Key（可选）</label>
+                <input id="aiKey" type="password" placeholder="sk-..." />
+              </div>
+              <div class="field">
+                <label>模型名称</label>
+                <input id="aiModel" placeholder="gpt-4 / deepseek-chat …" />
+              </div>
+              <div class="field full">
+                <div class="btn-row" style="margin-top:0">
+                  <button class="btn primary" id="btnSaveAi">💾 保存配置</button>
+                  <button class="btn" id="btnTestAi">🔌 测试连接</button>
+                  <button class="btn ghost" id="btnAiSync">🔄 触发一次 AI 同步</button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="card">
+            <h3>桥接对象一览 <span class="tag">window.KnowledgeBaseAI</span></h3>
+            <div id="apiList"></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>接入示例（供后续 AI / Agent 调用）</h3>
+          <div class="code-block" id="apiSample"></div>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
+
+<div class="modal-mask" id="modalMask">
+  <div class="modal" id="modalBox"></div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+window.KB_DATA = __KB_DATA__;
+
+/* ================= 核心状态 ================= */
+const LS_KEY = 'nebula_kb_user_items_v1';
+const LS_AI = 'nebula_kb_ai_config_v1';
+const LS_PI = 'nebula_kb_project_issues_v1';
+
+// 安全存储：file:// 或隐私模式下 localStorage 可能不可用，用内存兜底
+const _memStore = {};
+const safeStorage = {
+  get(k){ try{ const v = localStorage.getItem(k); return v===null ? undefined : v; }catch(e){ return _memStore[k]; } },
+  set(k,v){ try{ localStorage.setItem(k,v); }catch(e){ _memStore[k]=v; } },
+  remove(k){ try{ localStorage.removeItem(k); }catch(e){ delete _memStore[k]; } }
+};
+
+function loadUserItems(){
+  try{ return JSON.parse(safeStorage.get(LS_KEY)) || []; }catch(e){ return []; }
+}
+function saveUserItems(arr){
+  safeStorage.set(LS_KEY, JSON.stringify(arr));
+}
+function uid(){ return 'u' + Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+
+const CATEGORY_COLORS = {
+  '结算流程':'#8b5cf6','商店与货币':'#f59e0b','装备系统':'#3b82f6','地图与导航':'#0d9488',
+  'AI 行为':'#ef4444','拾取与背包':'#4f6ef7','战斗与操作':'#e11d48','表现与美术':'#ec4899',
+  '场景与物理':'#14b8a6','道具与增益':'#84cc16','性能优化':'#6366f1','其他':'#94a3b8'
+};
+const STATUS_COLORS = {'已解决':'#16a34a','待验证':'#f59e0b','进行中':'#3b82f6','未解决':'#ef4444'};
+const STATUS_ORDER = ['已解决','待验证','进行中','未解决'];
+const PRIORITY_COLORS = {'高':'#ef4444','中':'#f59e0b','缺陷':'#b45309','美术':'#8b5cf6','一般':'#94a3b8'};
+
+// 项目问题分类配色（时间轴/提交用）
+const PI_CAT_COLORS = {'玩法设计':'#8b5cf6','功能开发':'#3b82f6','性能优化':'#6366f1','资源管理':'#f59e0b','版本管理':'#0d9488','其他':'#94a3b8'};
+
+let userItems = loadUserItems();
+function allItems(){
+  return (window.KB_DATA.items || []).concat(userItems);
+}
+
+// ---- 项目问题及解决方案（分析提炼 + 手动提交）----
+function loadProjectIssues(){
+  try{ return JSON.parse(safeStorage.get(LS_PI)) || []; }catch(e){ return []; }
+}
+function saveProjectIssues(arr){
+  safeStorage.set(LS_PI, JSON.stringify(arr));
+}
+let userProjectIssues = loadProjectIssues();
+function allProjectIssues(){
+  const base = (window.KB_DATA.projectIssues || []);
+  return base.concat(userProjectIssues);
+}
+
+/* ================= 工具函数 ================= */
+const $ = s => document.querySelector(s);
+const esc = s => String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function toast(msg, type){
+  const t = $('#toast'); t.textContent = msg; t.className = 'toast show ' + (type||'');
+  clearTimeout(t._t); t._t = setTimeout(()=> t.className='toast', 2400);
+}
+function todayStr(){ return new Date().toISOString().slice(0,10); }
+function weekOf(dateStr){
+  if(!dateStr) return '未标注';
+  const d = new Date(dateStr+'T00:00:00');
+  const weekBuckets = [
+    ['第1周 07/06-07/12',new Date('2026-07-06T00:00:00'),new Date('2026-07-12T00:00:00')],
+    ['第2周 07/13-07/19',new Date('2026-07-13T00:00:00'),new Date('2026-07-19T00:00:00')],
+    ['第3周 07/20-07/26',new Date('2026-07-20T00:00:00'),new Date('2026-07-26T00:00:00')],
+    ['第4周 07/27-08/02',new Date('2026-07-27T00:00:00'),new Date('2026-08-02T00:00:00')],
+    ['第5周 08/03-08/09',new Date('2026-08-03T00:00:00'),new Date('2026-08-09T00:00:00')],
+    ['第6周 08/10-08/16',new Date('2026-08-10T00:00:00'),new Date('2026-08-16T00:00:00')],
+    ['第7周 08/17-08/23',new Date('2026-08-17T00:00:00'),new Date('2026-08-23T00:00:00')],
+    ['第8周 08/24-08/30',new Date('2026-08-24T00:00:00'),new Date('2026-08-30T00:00:00')],
+    ['第9周 08/31-09/06',new Date('2026-08-31T00:00:00'),new Date('2026-09-06T00:00:00')],
+    ['第10周 09/07-09/13',new Date('2026-09-07T00:00:00'),new Date('2026-09-13T00:00:00')],
+    ['第11周 09/14-09/20',new Date('2026-09-14T00:00:00'),new Date('2026-09-20T00:00:00')],
+  ];
+  for(const [label,s,e] of weekBuckets){ if(d>=s && d<=e) return label; }
+  return '未标注';
+}
+
+/* ================= 视图路由 ================= */
+let libTopicFilter = null; // 数据洞察-问题库的主题筛选状态
+let tlPiFilter = null;     // 时间轴的项目问题关联筛选（来自「项目提炼」联动）
+const TITLES = {insight:'项目提炼',dashboard:'数据洞察',timeline:'项目问题时间轴',daily:'项目问题提交',weekly:'每周问题总览',graph:'问题方案网络图谱',ai:'AI 接入接口'};
+function switchView(v){
+  document.querySelectorAll('.nav-item').forEach(b=> b.classList.toggle('active', b.dataset.view===v));
+  document.querySelectorAll('.view').forEach(s=> s.classList.remove('active'));
+  $('#view-'+v).classList.add('active');
+  $('#viewTitle').textContent = TITLES[v];
+  if(v==='insight') renderInsight();
+  if(v==='dashboard') renderDashboard();
+  if(v==='timeline') renderTimeline();
+  if(v==='daily') renderDaily();
+  if(v==='weekly') renderWeekly();
+  if(v==='graph') renderGraph();
+  if(v==='ai') renderAI();
+}
+document.querySelectorAll('.nav-item').forEach(b=> b.addEventListener('click', ()=>{
+  libTopicFilter = null;
+  tlPiFilter = null;
+  dimFilter = null;
+  dimPick.length = 0;
+  switchView(b.dataset.view);
+}));
+
+/* ================= 项目提炼（核心看板 · 与时间轴双向联动） ================= */
+let insightHlTopic = null;   // 从时间轴跳回提炼板块时的定位高亮
+let dimFilter = null;        // 六维标签筛选（项目提炼）
+let libDimFilter = null;     // 六维标签筛选（数据洞察问题库）
+const dimPick = [];          // 提交表单的六维标签多选
+let mDimPick = [];           // 补交/编辑弹窗的六维标签多选
+const DIMS = ()=> window.KB_DATA.dimensions || [];
+const DIM_MAP = ()=>{ const m={}; DIMS().forEach(d=> m[d.key]=d); return m; };
+function dimStyle(key){
+  const d = DIM_MAP()[key];
+  const c = d ? d.color : '#94a3b8';
+  return `--dc:${c};--dcs:${c}1f`;
+}
+function dimChip(key, on, attrs){
+  const d = DIM_MAP()[key];
+  const icon = d ? d.icon : '🏷️';
+  return `<span class="dim-chip ${on?'on':''}" style="${dimStyle(key)}" ${attrs||''}>${icon} ${esc(key)}</span>`;
+}
+function renderInsight(){
+  const items = allItems();
+  const total = items.length;
+  const allTopics = window.KB_DATA.topics || [];
+  const painPoints = dimFilter ? allTopics.filter(p=> (p.dims||[]).includes(dimFilter)) : allTopics;
+  const allPi = allProjectIssues();
+  const linkedIds = new Set();
+  painPoints.forEach(p=> (p.relatedPi||[]).forEach(id=> linkedIds.add(id)));
+  const piPending = allPi.filter(p=> p.status!=='已解决').length;
+  const minorCount = items.filter(i=> i.layer==='minor').length;
+  const unresolved = items.filter(i=> i.statusNorm==='未解决').length;
+
+  $('#insightStats').innerHTML = `
+    <div class="card stat" style="--c:var(--purple)"><div class="ico">🏷️</div><div class="label">衡量标签体系</div><div class="value">${DIMS().length}<span class="unit">维</span></div><div class="delta">来自用研报告 · N=34 样本</div></div>
+    <div class="card stat blue"><div class="ico">📋</div><div class="label">已覆盖问题明细</div><div class="value">${total-minorCount}<span class="unit">条</span></div><div class="delta">次级 ${minorCount} 条归入关联分析库</div></div>
+    <div class="card stat" style="--c:#0d9488"><div class="ico">🕐</div><div class="label">关联项目问题</div><div class="value">${allPi.length}<span class="unit">条</span></div><div class="delta">已与提炼条目建立关联 · 未收敛 ${piPending} 条</div></div>
+    <div class="card stat red"><div class="ico">⚠️</div><div class="label">未解决（全量）</div><div class="value">${unresolved}<span class="unit">条</span></div><div class="delta">3.0 预备优先收敛</div></div>`;
+
+  // ---- 六大衡量标签体系 ----
+  const dm = DIM_MAP();
+  const meta = window.KB_DATA.dimensionMeta || {};
+  $('#dimTag').textContent = meta.source || '';
+  const distCls = meta.distLabels || ['非常满意','比较满意','一般','不满意'];
+  const distCols = ['#16a34a','#84cc16','#f59e0b','#ef4444'];
+  $('#dimCards').innerHTML = DIMS().map(d=>{
+    const on = dimFilter===d.key;
+    const dist = d.dist || [0,0,0,0];
+    const sum = dist.reduce((a,b)=>a+b,0) || 1;
+    return `<div class="dim-card ${on?'on':''}" data-dim="${esc(d.key)}" style="${dimStyle(d.key)}">
+      <div class="dc-head">
+        <span style="font-size:17px">${d.icon}</span>
+        <span class="dc-key">${esc(d.key)}</span>
+        <span class="dc-rate">满意率 ${esc(d.passRate)}</span>
+      </div>
+      <div class="dc-def">${esc(d.def)}</div>
+      <div class="dc-meter" title="${dist.map((v,i)=>distCls[i]+' '+v+'%').join(' · ')}">
+        ${dist.map((v,i)=>`<span style="width:${v/sum*100}%;background:${distCols[i]}"></span>`).join('')}
+      </div>
+      <div class="dc-foot">
+        <span>明细 <b>${d.itemCount}</b> 条</span>
+        <span>未解决 <b>${d.unresolved}</b></span>
+        <span>提炼条目 <b>${(d.relatedTopics||[]).length}</b></span>
+        ${d.score && d.score!=='—' ? `<span>得分 <b>${esc(d.score)}</b></span><span>加权 <b>${esc(d.weighted)}</b></span>` : ''}
+      </div>
+      <div class="dc-foot" style="margin-top:6px">
+        <span style="color:var(--green)">▲ ${esc(d.good.slice(0,26))}…</span>
+      </div>
+      <div class="dc-foot" style="margin-top:2px">
+        <span style="color:var(--red)">▼ ${esc(d.bad.slice(0,26))}…</span>
+      </div>
+    </div>`;
+  }).join('');
+  $('#dimCards').querySelectorAll('.dim-card').forEach(c=>{
+    c.addEventListener('click', ()=>{
+      dimFilter = (dimFilter===c.dataset.dim) ? null : c.dataset.dim;
+      renderInsight();
+    });
+  });
+
+  $('#painTag').textContent = `${total} 条 → ${allTopics.length} 类`;
+  const ft = $('#dimFilterTag'), bn = $('#dimBanner');
+  if(dimFilter){
+    const d = dm[dimFilter] || {};
+    ft.style.display = 'inline-flex';
+    ft.textContent = `已按「${dimFilter}」筛选 · ${painPoints.length} 条`;
+    bn.style.display = 'flex';
+    bn.innerHTML = `🏷️ 当前维度：<b>${esc(dimFilter)}</b>（${esc(d.icon||'')} ${esc(d.def||'')}）· 命中 ${painPoints.length} 条提炼条目
+      <button class="lb-x" id="dimUnpick">清除维度筛选</button>`;
+    $('#dimUnpick').onclick = ()=>{ dimFilter = null; renderInsight(); };
+  } else {
+    ft.style.display='none'; bn.style.display='none'; bn.innerHTML='';
+  }
+  // 负责人按主题重新归一统计（合并别名、去括号注释、过滤非人名）
+  const ownersOf = (topic)=>{
+    const cnt = {};
+    items.filter(i=> i.topic===topic).forEach(i=> normalizeOwners(i.owner).forEach(n=> cnt[n]=(cnt[n]||0)+1));
+    return Object.keys(cnt).sort((a,b)=> cnt[b]-cnt[a]).slice(0,4);
+  };
+  $('#painList').innerHTML = painPoints.map((p,idx)=>{
+    const un = p.unresolved||0;
+    const piIds = p.relatedPi||[];
+    const owners = ownersOf(p.topic);
+    return `<div class="pain-item" data-topic="${esc(p.topic)}">
+      <div class="pi-head">
+        <span class="pi-no">P-${String(idx+1).padStart(2,'0')}</span>
+        <span class="pi-title">${esc(p.title)}</span>
+        <span class="pi-stats">
+          ${(p.dims||[]).map(d=>dimChip(d, dimFilter===d, `data-pick="${esc(d)}" title="按「${esc(d)}」筛选提炼条目"`)).join('')}
+          <span class="chip" style="background:var(--primary-soft);color:var(--primary-deep)">${p.count} 条</span>
+          ${un?`<span class="chip st-未解决">未解决 ${un}</span>`:`<span class="chip st-已解决">已收敛</span>`}
+        </span>
+      </div>
+      <div class="pi-desc">${esc(p.desc)}</div>
+      <div class="pi-keys">${(p.keys||[]).map(k=>`<span>${esc(k)}</span>`).join('')}</div>
+      <div class="pi-foot">
+        <span>主题：${esc(p.topic)}</span>
+        ${owners.length?`<span>👤 ${esc(owners.join('、'))}</span>`:''}
+        <span class="pi-acts">
+          <button class="pi-btn go" data-act="link" data-topic="${esc(p.topic)}">🔗 关联项目问题 ${piIds.length}</button>
+          <button class="pi-btn" data-act="detail" data-topic="${esc(p.topic)}">查看明细 →</button>
+        </span>
+      </div>
+    </div>`;
+  }).join('');
+
+  // 缺陷类任务总结
+  const ds = window.KB_DATA.defectSummary || {};
+  $('#defectSummary').innerHTML = `
+    <div class="defect-bar">
+      <span class="db-ico">🐛</span>
+      <div class="db-t">缺陷（Bug）专项</div>
+      <div class="db-n">${ds.resolved||0}<small style="font-size:12px;color:var(--muted)"> / ${ds.total||0} 已修复</small></div>
+    </div>`;
+
+  // 联动：关联项目问题 → 时间轴；查看明细 → 数据洞察问题库
+  $('#painList').querySelectorAll('button[data-act]').forEach(b=>{
+    b.addEventListener('click', (ev)=>{
+      ev.stopPropagation();
+      const topic = b.dataset.topic;
+      const p = painPoints.find(x=> x.topic===topic) || {};
+      if(b.dataset.act==='link'){
+        tlPiFilter = { topic, ids: p.relatedPi||[] };
+        switchView('timeline');
+      } else {
+        libTopicFilter = topic;
+        switchView('dashboard');
+      }
+    });
+  });
+  // 卡片上的六维标签 → 维度筛选
+  $('#painList').querySelectorAll('.dim-chip[data-pick]').forEach(c=>{
+    c.addEventListener('click', (ev)=>{
+      ev.stopPropagation();
+      dimFilter = (dimFilter===c.dataset.pick) ? null : c.dataset.pick;
+      renderInsight();
+    });
+  });
+
+  renderUrShots();
+  renderUrReport();
+
+  // 从时间轴跳回时高亮对应提炼条目
+  if(insightHlTopic){
+    const el = $('#painList').querySelector(`.pain-item[data-topic="${insightHlTopic}"]`);
+    if(el){ el.classList.add('hl'); if(el.scrollIntoView) el.scrollIntoView({block:'center'}); }
+    insightHlTopic = null;
+  }
+}
+
+/* ---- 用研问题定位图：标签与画面位置一一对应 ---- */
+function renderUrShots(){
+  const ur = window.KB_DATA.urReport || {};
+  const wrap = $('#urShots');
+  if(!wrap) return;
+  const shots = ur.images || [];
+  if(!shots.length){ wrap.innerHTML = '<div class="empty">暂无用研定位图</div>'; return; }
+  wrap.innerHTML = shots.map(im=>{
+    const tags = (im.hotspots||[]).map((h,i)=>{
+      const isSpot = h.kind==='亮点';
+      return `<span class="shot-tag ${isSpot?'spot':''}" style="${dimStyle(h.dim)};left:${h.x}%;top:${h.y}%"
+        data-shot="${esc(im.key)}" data-hs="${i}"
+        title="${esc(h.dim)} · ${esc(h.kind)}：${esc(h.text)}">${isSpot?'▲':'▼'} ${esc(h.dim)}</span>`;
+    }).join('');
+    const dims = [...new Set((im.hotspots||[]).map(h=>h.dim))];
+    return `<div class="shot-box">
+      <div class="shot-head">
+        <span class="sh-t">${esc(im.title)}</span>
+        <span class="sh-d">${esc(im.desc)}</span>
+      </div>
+      <div class="shot-canvas">
+        <img src="${im.src}" alt="${esc(im.title)}" loading="lazy" />
+        ${tags}
+      </div>
+      <div class="shot-legend">
+        ${dims.map(d=>dimChip(d, false, `data-pick="${esc(d)}"`)).join('')}
+        <span style="margin-left:auto;font-size:11.5px;color:var(--muted)">共 ${(im.hotspots||[]).length} 个标签 · ▲亮点 ▼问题</span>
+      </div>
+    </div>`;
+  }).join('');
+  // 标签点击 → 详情弹窗
+  wrap.querySelectorAll('.shot-tag').forEach(t=>{
+    t.addEventListener('click', ()=>{
+      const im = shots.find(s=> s.key===t.dataset.shot);
+      const h = (im.hotspots||[])[+t.dataset.hs];
+      if(!h) return;
+      const d = DIM_MAP()[h.dim] || {};
+      const list = h.kind==='亮点' ? (d.good||'') : (d.bad||'');
+      $('#modalBox').innerHTML = `
+        <h3 style="margin-bottom:6px">${esc(im.title)}</h3>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:14px">用研问题定位 · ${esc(h.kind)}</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">
+          ${dimChip(h.dim, true)}
+          <span class="chip" style="background:${h.kind==='亮点'?'var(--green-soft)':'var(--red-soft)'};color:${h.kind==='亮点'?'#16a34a':'#b91c1c'}">${esc(h.kind)}</span>
+        </div>
+        <div class="pd-sec"><div class="pd-h">具体问题所在</div>
+          <div class="pd-b">${esc(h.text)}</div></div>
+        ${d.def?`<div class="pd-sec"><div class="pd-h">维度定义</div><div class="pd-b">${esc(d.def)}</div></div>`:''}
+        ${list?`<div class="pd-sec"><div class="pd-h">用研结论（${esc(h.kind==='亮点'?'亮点':'不足')}）</div><div class="pd-b">${esc(list)}</div></div>`:''}
+        ${d.advice?`<div class="pd-sec"><div class="pd-h">改进建议</div><div class="pd-b sol">${esc(d.advice)}</div></div>`:''}
+        <div class="btn-row" style="margin-top:14px">
+          <button class="btn primary" id="mDim">🏷️ 在项目提炼中筛选「${esc(h.dim)}」</button>
+          <button class="btn ghost" id="mClose">关闭</button>
+        </div>`;
+      $('#modalMask').classList.add('show');
+      $('#mClose').onclick = ()=> $('#modalMask').classList.remove('show');
+      $('#mDim').onclick = ()=>{
+        $('#modalMask').classList.remove('show');
+        dimFilter = h.dim; renderInsight();
+      };
+    });
+  });
+  // 图例维度 → 筛选
+  wrap.querySelectorAll('.dim-chip[data-pick]').forEach(c=>{
+    c.addEventListener('click', ()=>{ dimFilter = c.dataset.pick; renderInsight(); });
+  });
+}
+
+/* ---- 用研报告要点 ---- */
+function renderUrReport(){
+  const ur = window.KB_DATA.urReport || {};
+  const el = $('#urReport');
+  if(!el) return;
+  $('#urTag').textContent = ur.subtitle || '';
+  el.innerHTML = `
+    <div class="ur-concl"><b>📌 ${esc(ur.title||'')}</b><br>${esc(ur.conclusion||'')}</div>
+    <div class="ur-two">
+      <div class="u2" style="border-left:3px solid var(--green)"><b>✅ 留存动因（留存率 92%）</b>${esc((ur.retention||{}).stay||'')}</div>
+      <div class="u2" style="border-left:3px solid var(--red)"><b>⚠️ 流失原因</b>${esc((ur.churn||{}).leave||'')}</div>
+    </div>
+    <div style="font-size:13px;font-weight:700;margin:16px 0 9px">整体建议（按六维标签归类）</div>
+    ${(ur.advices||[]).map(a=>`
+      <div class="ur-adv" style="${dimStyle(a.dim)}">
+        <div class="ua-h">
+          <span class="ua-n">${a.n}</span>
+          <span class="ua-t">${esc(a.t)}</span>
+          ${dimChip(a.dim, false, `data-pick="${esc(a.dim)}"`)}
+        </div>
+        <div class="ua-d">${esc(a.d)}</div>
+      </div>`).join('')}
+    <div class="shot-legend" style="border:none;padding:0;margin-top:12px">
+      <span style="font-size:11.5px;color:var(--muted)">维度说明：${DIMS().map(d=>`${d.icon} ${d.key}`).join(' · ')} · 计分口径：-2 非常不好 ～ +2 非常好</span>
+    </div>`;
+  el.querySelectorAll('.dim-chip[data-pick]').forEach(c=>{
+    c.addEventListener('click', ()=>{ dimFilter = c.dataset.pick; renderInsight(); });
+  });
+}
+
+/* ================= 数据洞察（数据分析仪表盘 + 全部问题库 合并） ================= */
+function renderDashboard(){
+  const items = allItems();
+  const total = items.length;
+  const byStatus = {}; STATUS_ORDER.forEach(s=> byStatus[s]=0);
+  items.forEach(i=> byStatus[i.statusNorm] = (byStatus[i.statusNorm]||0)+1);
+  const resolved = byStatus['已解决'];
+  const rate = total ? Math.round(resolved/total*100) : 0;
+  const v3 = items.filter(i=> verOf(i)==='v3.0');
+  const v3Unresolved = v3.filter(i=> i.statusNorm==='未解决').length;
+  const v2Count = total - v3.length;
+
+  $('#statCards').innerHTML = `
+    <div class="card stat" style="--c:#0d9488"><div class="ico">🚀</div><div class="label">3.0 预备任务（当前）</div><div class="value">${v3.length}<span class="unit">条</span></div><div class="delta">过渡期暂定 · 未解决 ${v3Unresolved} 条</div></div>
+    <div class="card stat green"><div class="ico">✅</div><div class="label">已解决</div><div class="value">${resolved}<span class="unit">条</span></div><div class="delta">解决率 ${rate}%</div></div>
+    <div class="card stat blue"><div class="ico">📋</div><div class="label">2.0 版本归档（已结束）</div><div class="value">${v2Count}<span class="unit">条</span></div><div class="delta">07/06 - 08/31 已冻结</div></div>
+    <div class="card stat red"><div class="ico">⚠️</div><div class="label">未解决（全量）</div><div class="value">${byStatus['未解决']}<span class="unit">条</span></div><div class="delta">3.0 预备优先收敛</div></div>`;
+
+  // 状态分布
+  $('#donutStatus').innerHTML = donutChart(STATUS_ORDER.map(s=>({label:s,value:byStatus[s],color:STATUS_COLORS[s]})), 168);
+  $('#legendStatus').innerHTML = STATUS_ORDER.map(s=> `<span class="lg"><span class="sw" style="background:${STATUS_COLORS[s]}"></span>${s} · ${byStatus[s]}</span>`).join('');
+
+  // 六大衡量标签分布（统计口径与图谱 / 项目提炼一致）
+  const dmv = DIM_MAP();
+  const dimRows = DIMS().map(d=>{
+    const sub = items.filter(i=> (i.dims||[]).includes(d.key));
+    return {key:d.key, icon:d.icon, color:d.color, n:sub.length,
+            unresolved:sub.filter(i=> i.statusNorm==='未解决').length,
+            rate:d.passRate, def:d.def};
+  }).sort((a,b)=> b.n-a.n);
+  const maxD = Math.max(...dimRows.map(r=>r.n), 1);
+  $('#barDimension').innerHTML = dimRows.map(r=>`
+    <div class="bar-row" title="${esc(r.def)}">
+      <div class="b-label" style="width:76px">${r.icon} ${esc(r.key)}</div>
+      <div class="b-track">
+        <div class="b-fill" style="width:${Math.round(r.n/maxD*100)}%;background:${r.color}">${r.n}</div>
+      </div>
+      <div class="b-val" style="width:auto;font-size:11.5px;color:var(--muted)">未解决 ${r.unresolved}</div>
+    </div>`).join('')
+    + `<div style="margin-top:10px;font-size:11.5px;color:var(--muted);line-height:1.7">
+        满意率：${dimRows.map(r=>`${r.icon} ${r.key} ${esc(r.rate)}`).join(' · ')}<br>
+        <span style="color:var(--muted)">数据来源：用研测试报告（N=34）· 每条问题可带多个标签</span></div>`;
+
+  // 版本阶段概览
+  const vs = window.KB_DATA.versionSummary || {};
+  $('#versionSummary').innerHTML = `
+    <div style="display:flex;flex-wrap:wrap;gap:12px 28px">
+      <div style="flex:1;min-width:220px">
+        <div style="font-size:12px;color:var(--muted)">版本定位</div>
+        <div style="font-size:13.5px;margin-top:4px">${esc(vs.positioning||'')}</div>
+      </div>
+      <div style="flex:1;min-width:220px">
+        <div style="font-size:12px;color:var(--muted)">核心原则</div>
+        <div style="font-size:13.5px;margin-top:4px;color:var(--primary-deep)">${esc(vs.principle||'')}</div>
+      </div>
+      <div style="min-width:140px">
+        <div style="font-size:12px;color:var(--muted)">版本周期</div>
+        <div style="font-size:13.5px;margin-top:4px" class="mono">${esc(vs.period||'')}</div>
+      </div>
+    </div>`;
+
+  // 合并进来的全部问题库
+  renderLibrary();
+}
+
+function donutChart(segments, size){
+  const total = segments.reduce((s,x)=>s+x.value,0);
+  if(!total) return `<div class="empty" style="padding:20px">暂无数据</div>`;
+  const r = size/2 - 14, cx = size/2, cy = size/2, sw = 26;
+  const C = 2*Math.PI*r;
+  let offset = 0;
+  let arcs = '';
+  segments.forEach(seg=>{
+    if(!seg.value) return;
+    const frac = seg.value/total;
+    const dash = frac*C;
+    arcs += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${seg.color}" stroke-width="${sw}"
+      stroke-dasharray="${dash} ${C-dash}" stroke-dashoffset="${-offset}" transform="rotate(-90 ${cx} ${cy})">
+      <title>${esc(seg.label)}: ${seg.value}</title></circle>`;
+    offset += dash;
+  });
+  return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">${arcs}
+    <text x="${cx}" y="${cy-2}" text-anchor="middle" font-size="24" font-weight="800" fill="#1a2233">${total}</text>
+    <text x="${cx}" y="${cy+18}" text-anchor="middle" font-size="11" fill="#6b7280">总条目</text></svg>`;
+}
+
+function weeklyTrend(items){
+  const weeks = ['第1周 07/06-07/12','第2周 07/13-07/19','第3周 07/20-07/26','第4周 07/27-08/02','第5周 08/03-08/09','第6周 08/10-08/16','第7周 08/17-08/23','第8周 08/24-08/30','第9周 08/31-09/06','第10周 09/07-09/13','第11周 09/14-09/20'];
+  const added = {}, solved = {};
+  weeks.forEach(w=>{added[w]=0;solved[w]=0});
+  items.forEach(i=>{
+    const w = i.week || weekOf(i.date);
+    if(!w || !(w in added)) return;
+    added[w]++;
+    if(i.statusNorm==='已解决') solved[w]++;
+  });
+  const labels = weeks.map(w=> 'W'+w.match(/第(\d+)周/)[1]);
+  const data = weeks.map(w=>({added:added[w], solved:solved[w]}));
+  const W = 560, H = 260, padL=34, padR=14, padT=16, padB=30;
+  const maxV = Math.max(...data.map(d=>d.added), 4);
+  const iw = (W-padL-padR)/weeks.length;
+  let bars = '', grid = '';
+  for(let g=0; g<=4; g++){
+    const y = padT + (H-padT-padB)*(g/4);
+    grid += `<line x1="${padL}" y1="${y}" x2="${W-padR}" y2="${y}" stroke="#eef0f6" stroke-width="1"/>`;
+    grid += `<text x="${padL-8}" y="${y+4}" text-anchor="end" font-size="10" fill="#9aa3b5">${Math.round(maxV*(1-g/4))}</text>`;
+  }
+  data.forEach((d,i)=>{
+    const x = padL + i*iw + iw/2;
+    const h1 = (H-padT-padB)*(d.added/maxV);
+    const h2 = (H-padT-padB)*(d.solved/maxV);
+    const y1 = H-padB-h1, y2 = H-padB-h2;
+    bars += `<rect x="${x-11}" y="${y1}" width="13" height="${h1}" rx="3" fill="#4f6ef7"><title>新增 ${d.added}</title></rect>`;
+    bars += `<rect x="${x+4}" y="${y2}" width="13" height="${h2}" rx="3" fill="#16a34a"><title>解决 ${d.solved}</title></rect>`;
+    bars += `<text x="${x}" y="${H-padB+14}" text-anchor="middle" font-size="10" fill="#9aa3b5">${labels[i]}</text>`;
+  });
+  return `<svg width="100%" viewBox="0 0 ${W} ${H}">${grid}${bars}</svg>
+    <div class="legend" style="justify-content:center"><span class="lg"><span class="sw" style="background:#4f6ef7"></span>新增问题</span><span class="lg"><span class="sw" style="background:#16a34a"></span>已解决</span></div>`;
+}
+
+/* ================= 每日提交 ================= */
+function renderDaily(){
+  renderDimPick();
+  // 填充分类下拉（项目问题分类）
+  const catSel = $('#fCategory');
+  catSel.innerHTML = (window.KB_DATA.projectIssueCategories||['玩法设计','功能开发','性能优化','资源管理','版本管理','其他']).map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join('');
+  $('#fDate').value = todayStr();
+  renderMySubmissions();
+}
+
+/* 提交表单的六维标签多选 */
+function renderDimPick(){
+  const box = $('#fDims');
+  if(!box) return;
+  box.innerHTML = DIMS().map(d=>{
+    const on = dimPick.includes(d.key);
+    return `<span class="dp ${on?'on':''}" data-key="${esc(d.key)}" style="${dimStyle(d.key)}" title="${esc(d.def)}">${d.icon} ${esc(d.key)}</span>`;
+  }).join('');
+  box.querySelectorAll('.dp').forEach(el=>{
+    el.addEventListener('click', ()=>{
+      const k = el.dataset.key;
+      const i = dimPick.indexOf(k);
+      if(i>=0) dimPick.splice(i,1); else dimPick.push(k);
+      renderDimPick();
+    });
+  });
+}
+
+function renderMySubmissions(){
+  const list = $('#mySubmissions');
+  $('#myCount').textContent = userProjectIssues.length + ' 条';
+  if(!userProjectIssues.length){
+    list.innerHTML = `<div class="empty"><div class="e-ico">🕐</div><div>暂无手动提交的项目问题<br>提交后将自动进入「项目问题时间轴」</div></div>`;
+    return;
+  }
+  list.innerHTML = userProjectIssues.slice().reverse().map(it=>{
+    const isResolved = it.status==='已解决';
+    const catColor = PI_CAT_COLORS[it.category]||'#94a3b8';
+    return `<div style="border:1px solid var(--border);border-radius:11px;padding:12px 14px;margin-bottom:10px">
+      <div style="font-weight:600;font-size:13.5px">${esc(it.title)}</div>
+      <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap">
+        <span class="chip" style="background:${catColor}1a;color:${catColor}">${esc(it.category)}</span>
+        <span class="chip st-${esc(it.status)}">${esc(it.status)}</span>
+        ${it.severity?`<span class="chip" style="background:var(--bg);color:var(--muted)">${esc(it.severity)}</span>`:''}
+        ${(it.ksf&&it.ksf.length)?`<span class="chip" style="background:var(--bg);color:var(--muted)">🔑 KSF ${it.ksf.length} 项</span>`:''}
+        ${(it.dims||[]).map(d=>dimChip(d,false)).join('')}
+      </div>
+      ${it.goal?`<div style="margin-top:8px;font-size:12.5px;color:var(--muted);line-height:1.5">🎯 ${esc(it.goal)}</div>`:''}
+      ${it.solution?`<div style="margin-top:8px;font-size:12.5px;color:var(--muted)">💡 ${esc(it.solution)}</div>`:''}
+      <div style="margin-top:6px;font-size:11.5px;color:var(--muted)">${esc(it.date||'')} · ${esc(it.source||'手动提交')}</div>
+      <div style="margin-top:9px;display:flex;gap:8px">
+        ${!isResolved?`<button class="btn sm primary" data-act="supplement" data-id="${it.id}">💡 补交方案</button>`:''}
+        ${isResolved?`<button class="btn sm ghost" data-act="edit" data-id="${it.id}">✏️ 编辑</button>`:''}
+        <button class="btn sm ghost danger" data-act="del" data-id="${it.id}">删除</button>
+      </div>
+    </div>`;
+  }).join('');
+
+  list.querySelectorAll('button[data-act]').forEach(b=>{
+    b.addEventListener('click', ()=>{
+      const id = b.dataset.id, act = b.dataset.act;
+      const it = userProjectIssues.find(x=>x.id===id);
+      if(act==='del'){
+        if(confirm('确定删除这条项目问题？')){ userProjectIssues = userProjectIssues.filter(x=>x.id!==id); saveProjectIssues(userProjectIssues); renderMySubmissions(); toast('已删除','err'); }
+      } else if(act==='supplement'){
+        openSupplementModal(it);
+      } else if(act==='edit'){
+        openSupplementModal(it, true);
+      }
+    });
+  });
+}
+
+function openSupplementModal(it, isEdit){
+  const ksfText = (it.ksf||[]).join('\n');
+  $('#modalBox').innerHTML = `
+    <h3 style="margin-bottom:4px">${isEdit?'✏️ 编辑项目问题':'💡 补交解决方案'}</h3>
+    <div class="meth-flow" style="margin-top:8px">
+      <span class="fstep">🎯 目标</span><span class="farrow">→</span>
+      <span class="fstep">🔑 KSF</span><span class="farrow">→</span>
+      <span class="fstep">💡 方案</span><span class="farrow">→</span>
+      <span class="fstep">🔄 复盘</span>
+    </div>
+    <div class="form-grid">
+      <div class="field full"><label>事项标题</label><input id="mTitle" value="${esc(it.title)}"></div>
+      <div class="field full"><label>🎯 目标成果</label><textarea id="mGoal">${esc(it.goal||'')}</textarea></div>
+      <div class="field full"><label>🔑 关键成功要素 KSF（每行一条）</label><textarea id="mKsf">${esc(ksfText)}</textarea></div>
+      <div class="field full"><label>💡 解决方案（多套备选优中选优）</label><textarea id="mSolution">${esc(it.solution||'')}</textarea></div>
+      <div class="field full"><label>🔄 复盘反思（验证方式 + 复盘节点）</label><textarea id="mReview">${esc(it.review||'')}</textarea></div>
+      <div class="field"><label>分类</label><select id="mCategory">
+        ${(window.KB_DATA.projectIssueCategories||[]).map(c=>`<option ${c===it.category?'selected':''}>${c}</option>`).join('')}
+      </select></div>
+      <div class="field"><label>严重程度</label><select id="mSeverity">
+        ${['高','中','低'].map(s=>`<option ${s===it.severity?'selected':''}>${s}</option>`).join('')}
+      </select></div>
+      <div class="field full"><label>🏷️ 衡量标签（六大项 · 可多选）</label>
+        <div class="dim-pick" id="mDims"></div>
+      </div>
+      <div class="field"><label>提出日期</label><input type="date" id="mDate" value="${esc(it.date||'')}"></div>
+      <div class="field"><label>来源</label><input id="mSource" value="${esc(it.source||'')}"></div>
+      <div class="field full"><div class="btn-row" style="margin-top:0">
+        <button class="btn primary" id="mSave">💾 保存${isEdit?'':'（标记为已解决）'}</button>
+        <button class="btn ghost" id="mCancel">取消</button>
+      </div></div>
+    </div>`;
+  $('#modalMask').classList.add('show');
+  // 衡量标签多选（以该条现有标签为初始选中）
+  mDimPick = (it.dims||[]).slice();
+  const mBox = $('#mDims');
+  const paintMDims = ()=>{
+    mBox.innerHTML = DIMS().map(d=>{
+      const on = mDimPick.includes(d.key);
+      return `<span class="dp ${on?'on':''}" data-key="${esc(d.key)}" style="${dimStyle(d.key)}" title="${esc(d.def)}">${d.icon} ${esc(d.key)}</span>`;
+    }).join('');
+    mBox.querySelectorAll('.dp').forEach(el=>{
+      el.addEventListener('click', ()=>{
+        const k = el.dataset.key, i = mDimPick.indexOf(k);
+        if(i>=0) mDimPick.splice(i,1); else mDimPick.push(k);
+        paintMDims();
+      });
+    });
+  };
+  paintMDims();
+  $('#mCancel').onclick = ()=> $('#modalMask').classList.remove('show');
+  $('#mSave').onclick = ()=>{
+    const it2 = userProjectIssues.find(x=>x.id===it.id);
+    if(!it2) return;
+    it2.title = $('#mTitle').value.trim();
+    it2.goal = $('#mGoal').value.trim();
+    it2.ksf = $('#mKsf').value.split('\n').map(s=>s.trim()).filter(Boolean);
+    it2.solution = $('#mSolution').value.trim();
+    it2.review = $('#mReview').value.trim();
+    it2.category = $('#mCategory').value;
+    it2.severity = $('#mSeverity').value;
+    it2.dims = mDimPick.slice();
+    it2.date = $('#mDate').value || it2.date;
+    it2.source = $('#mSource').value.trim() || it2.source || '手动提交';
+    it2.status = '已解决';
+    it2.resolvedAt = todayStr();
+    saveProjectIssues(userProjectIssues); renderMySubmissions(); $('#modalMask').classList.remove('show');
+    toast('已保存，状态更新为「已解决」','ok');
+  };
+}
+
+$('#btnSubmit').addEventListener('click', ()=>{
+  const title = $('#fTitle').value.trim();
+  const goal = $('#fGoal').value.trim();
+  if(!title){ toast('请填写事项标题','err'); $('#fTitle').focus(); return; }
+  if(!goal){ toast('请填写目标成果','err'); $('#fGoal').focus(); return; }
+  const statusVal = document.querySelector('input[name="status"]:checked').value;
+  const status = statusVal==='已解决'?'已解决':'未解决';
+  const solution = $('#fSolution').value.trim();
+  if(status==='已解决' && !solution){ toast('已解决问题请填写解决方案','err'); return; }
+  if(!dimPick.length){ toast('请至少选择一个衡量标签（六大项）','err'); return; }
+  const item = {
+    id: uid(), title, goal,
+    dims: dimPick.slice(),
+    ksf: $('#fKsf').value.split('\n').map(s=>s.trim()).filter(Boolean),
+    solution,
+    review: $('#fReview').value.trim(),
+    category: $('#fCategory').value,
+    severity: $('#fSeverity').value,
+    date: $('#fDate').value||todayStr(),
+    source: $('#fSource').value.trim()||'手动提交',
+    status,
+    resolvedAt: status==='已解决'? todayStr() : ''
+  };
+  userProjectIssues.push(item); saveProjectIssues(userProjectIssues);
+  $('#fTitle').value=''; $('#fGoal').value=''; $('#fKsf').value=''; $('#fSolution').value=''; $('#fReview').value=''; $('#fSource').value='';
+  document.querySelector('input[name="status"][value="未解决"]').checked = true;
+  setStatusHighlight();
+  dimPick.length = 0; renderDimPick();
+  renderMySubmissions();
+  toast(status==='已解决'?'已提交项目问题及解决方案 ✅':'已提交，标记为「未解决」，可后续补交方案','ok');
+});
+
+$('#btnReset').addEventListener('click', ()=>{
+  $('#fTitle').value=''; $('#fGoal').value=''; $('#fKsf').value=''; $('#fSolution').value=''; $('#fReview').value=''; $('#fSource').value='';
+  document.querySelector('input[name="status"][value="未解决"]').checked = true;
+  setStatusHighlight();
+  dimPick.length = 0; renderDimPick();
+});
+
+// 解决状态 radio 高亮联动（四段式字段始终显示，仅切换卡片高亮）
+function setStatusHighlight(){
+  const resolved = document.querySelector('input[name="status"][value="已解决"]').checked;
+  $('#rcResolved').classList.toggle('sel-resolved', resolved);
+  $('#rcUnresolved').classList.toggle('sel-unresolved', !resolved);
+}
+document.querySelectorAll('input[name="status"]').forEach(r=>{
+  r.addEventListener('change', setStatusHighlight);
+});
+
+/* ================= 项目问题时间轴 ================= */
+function renderTimeline(){
+  const catSel = $('#tlCategory');
+  if(catSel.options.length<=1){
+    catSel.innerHTML = `<option value="">全部分类</option>` + (window.KB_DATA.projectIssueCategories||[]).map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join('');
+  }
+  renderTimelineBody();
+}
+function renderTimelineBody(){
+  const fs = $('#tlStatus').value, fc = $('#tlCategory').value;
+  const fv = $('#tlVersion') ? $('#tlVersion').value : '';
+  let list = allProjectIssues().filter(i=>{
+    if(fs && i.status!==fs) return false;
+    if(fc && i.category!==fc) return false;
+    if(fv && verOf(i)!==fv) return false;
+    if(tlPiFilter && tlPiFilter.ids && !tlPiFilter.ids.includes(i.id)) return false;
+    return true;
+  }).slice().sort((a,b)=> (a.date||'').localeCompare(b.date||''));
+  $('#tlCount').textContent = tlPiFilter ? `关联 ${list.length} 条 / 共 ${allProjectIssues().length} 条` : `共 ${list.length} 条`;
+
+  // 联动来源提示条
+  const bar = $('#tlLinkBar');
+  if(tlPiFilter){
+    bar.style.display = 'flex';
+    bar.innerHTML = `🔗 来自项目提炼：<b>${esc(tlPiFilter.topic)}</b> · 关联 ${list.length} 条项目问题
+      <button class="lb-x" id="tlUnlink">清除关联，查看全部</button>`;
+    $('#tlUnlink').onclick = ()=>{
+      tlPiFilter = null;
+      insightHlTopic = null;
+      renderTimelineBody();
+    };
+  } else {
+    bar.style.display = 'none';
+    bar.innerHTML = '';
+  }
+
+  const track = $('#timelineTrack');
+  if(!list.length){ track.innerHTML = `<div class="empty" style="min-width:100%">无匹配的项目问题</div>`; return; }
+
+  track.innerHTML = list.map((it,i)=>{
+    const dotColor = STATUS_COLORS[it.status]||'#94a3b8';
+    const catColor = PI_CAT_COLORS[it.category]||'#94a3b8';
+    const above = i%2===0;
+    const isV3 = verOf(it)==='v3.0';
+    const verBadge = isV3
+      ? '<span class="ver-badge v20dev">🚀 3.0 预备</span>'
+      : '<span class="ver-badge v10">📦 2.0 归档</span>';
+    const card = `<div class="tl-card" data-pi="${esc(it.id)}">
+      <div class="tc-date">${verBadge} ${esc(it.date||'')}${it.source?(' · '+esc(it.source)):''}</div>
+      <div class="tc-title">${esc(it.title)}</div>
+      <div class="tc-tags">
+        <span class="chip" style="background:${catColor}1a;color:${catColor}">${esc(it.category)}</span>
+        <span class="chip st-${esc(it.status)}">${esc(it.status)}</span>
+        ${it.severity?`<span class="chip" style="background:var(--bg);color:var(--muted)">${esc(it.severity)}</span>`:''}
+        ${(it.ksf&&it.ksf.length)?`<span class="chip" style="background:var(--primary-soft);color:var(--primary-deep)">🔑 KSF ${it.ksf.length}</span>`:''}
+        ${(it.dims||[]).map(d=>dimChip(d, false, `data-pick="${esc(d)}"`)).join('')}
+        ${(it.relatedTopics&&it.relatedTopics.length)?it.relatedTopics.map(t=>`<span class="tc-topic" data-topic="${esc(t)}" title="跳转到项目提炼查看该条目">🎯 ${esc(t)}</span>`).join(''):''}
+      </div>
+      ${it.goal?`<div class="tc-sol">🎯 ${esc(it.goal)}</div>`:''}
+      ${it.solution?`<div class="tc-sol"><b>💡 方案：</b>${esc(it.solution)}</div>`:`<div class="tc-sol" style="color:var(--red)">⚠ 尚未记录解决方案</div>`}
+    </div>`;
+    return `<div class="tl-node">
+      <div class="tl-slot top">${above?card:''}</div>
+      <div class="tl-dot" style="--dot:${dotColor}"></div>
+      <div class="tl-slot bottom">${above?'':card}</div>
+    </div>`;
+  }).join('');
+
+  track.querySelectorAll('.tl-card').forEach(c=>{
+    c.addEventListener('click', ()=>{
+      const it = allProjectIssues().find(x=>x.id===c.dataset.pi);
+      if(it) openPIDetailModal(it);
+    });
+  });
+  // 卡片上的六维标签 → 跳回「项目提炼」按维度筛选
+  track.querySelectorAll('.dim-chip[data-pick]').forEach(c=>{
+    c.addEventListener('click', (ev)=>{
+      ev.stopPropagation();
+      dimFilter = c.dataset.pick;
+      switchView('insight');
+    });
+  });
+  // 卡片上的提炼主题 → 跳回「项目提炼」并高亮
+  track.querySelectorAll('.tc-topic').forEach(t=>{
+    t.addEventListener('click', (ev)=>{
+      ev.stopPropagation();
+      insightHlTopic = t.dataset.topic;
+      tlPiFilter = null;
+      switchView('insight');
+    });
+  });
+}
+function openPIDetailModal(it){
+  const catColor = PI_CAT_COLORS[it.category]||'#94a3b8';
+  const canEdit = userProjectIssues.some(x=>x.id===it.id);
+  const ksf = it.ksf||[];
+  $('#modalBox').innerHTML = `
+    <h3 style="margin-bottom:4px">${esc(it.title)}</h3>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:14px">${esc(it.date||'')}${it.source?(' · '+esc(it.source)):''}</div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:18px">
+      <span class="chip" style="background:${catColor}1a;color:${catColor}">${esc(it.category)}</span>
+      <span class="chip st-${esc(it.status)}">${esc(it.status)}</span>
+      ${it.severity?`<span class="chip" style="background:var(--bg);color:var(--muted)">严重程度 ${esc(it.severity)}</span>`:''}
+    </div>
+    <div class="pd-sec">
+      <div class="pd-h">🎯 正确的目标</div>
+      <div class="pd-b">${esc(it.goal||it.problem||'—')}</div>
+    </div>
+    <div class="pd-sec">
+      <div class="pd-h">🔑 关键成功要素 KSF</div>
+      ${ksf.length?`<ul class="ksf-list">${ksf.map(k=>`<li>${esc(k)}</li>`).join('')}</ul>`:`<div class="pd-b">—</div>`}
+    </div>
+    <div class="pd-sec">
+      <div class="pd-h">💡 解决方案</div>
+      ${it.solution?`<div class="pd-b sol">${esc(it.solution)}</div>`:`<div class="pd-b" style="color:var(--red)">⚠️ 尚未记录解决方案</div>`}
+    </div>
+    <div class="pd-sec">
+      <div class="pd-h">🔄 复盘反思</div>
+      <div class="pd-b">${esc(it.review||'—')}</div>
+    </div>
+    ${(it.dims&&it.dims.length)?`<div class="pd-sec">
+      <div class="pd-h">🏷️ 衡量标签（六大项）</div>
+      <div class="pd-b pd-topics">${it.dims.map(d=>dimChip(d, true)).join('')}</div>
+    </div>`:''}
+    ${(it.relatedTopics&&it.relatedTopics.length)?`<div class="pd-sec">
+      <div class="pd-h">🎯 关联提炼主题</div>
+      <div class="pd-b pd-topics">${it.relatedTopics.map(t=>`<span class="tc-topic" data-topic="${esc(t)}">${esc(t)}</span>`).join('')}</div>
+    </div>`:''}
+    <div class="btn-row" style="margin-top:14px">
+      ${canEdit && it.status!=='已解决'?`<button class="btn primary" id="mSupp">💡 补交方案</button>`:''}
+      <button class="btn ${canEdit&&it.status!=='已解决'?'ghost':'primary'}" id="mClose">关闭</button>
+    </div>`;
+  $('#modalMask').classList.add('show');
+  $('#mClose').onclick = ()=> $('#modalMask').classList.remove('show');
+  const supp = $('#mSupp');
+  if(supp) supp.onclick = ()=>{ $('#modalMask').classList.remove('show'); openSupplementModal(it); };
+  $('#modalBox').querySelectorAll('.tc-topic').forEach(t=>{
+    t.onclick = ()=>{
+      $('#modalMask').classList.remove('show');
+      insightHlTopic = t.dataset.topic;
+      tlPiFilter = null;
+      switchView('insight');
+    };
+  });
+}
+$('#tlVersion').addEventListener('change', renderTimelineBody);
+$('#tlStatus').addEventListener('change', renderTimelineBody);
+$('#tlCategory').addEventListener('change', renderTimelineBody);
+
+/* ================= 每周总览 ================= */
+let currentWeek = null;
+function allWeeks(){
+  const set = new Set((window.KB_DATA.items||[]).map(i=>i.week||weekOf(i.date)).filter(w=>w&&w!=='未标注'));
+  userItems.forEach(i=> set.add(weekOf(i.date)));
+  return ['第1周 07/06-07/12','第2周 07/13-07/19','第3周 07/20-07/26','第4周 07/27-08/02','第5周 08/03-08/09','第6周 08/10-08/16','第7周 08/17-08/23','第8周 08/24-08/30','第9周 08/31-09/06','第10周 09/07-09/13','第11周 09/14-09/20'].filter(w=>set.has(w));
+}
+function renderWeekly(){
+  const weeks = allWeeks();
+  const pill = (w, on)=> `<div class="week-pill ${on?'on':''}" data-w="${esc(w)}"><span class="w-badge">${esc(w.slice(0,3))}</span>${esc(w.slice(4))}</div>`;
+  // 版本分组：W1-W9 = 2.0 核心玩法开发期（已结束）；W10+ = 3.0 过渡期（下版本预备）
+  const weekNo = w=> parseInt((w.match(/第(\d+)周/)||[])[1]||0);
+  const devWeeks = weeks.filter(w=> weekNo(w)<=9);
+  const transWeeks = weeks.filter(w=> weekNo(w)>=10);
+  let html = '';
+  if(devWeeks.length) html += `<div class="week-group-title">📦 2.0 核心玩法 · 开发期（07/06 - 08/31 版本冻结 · 已结束）</div>` + devWeeks.map(w=>pill(w, false)).join('');
+  if(transWeeks.length) html += `<div class="week-group-title">🚀 3.0 过渡期 · 下版本预备（体验打磨 / 3.0 规划）</div>` + transWeeks.map(w=>pill(w, w===weeks[weeks.length-1])).join('');
+  $('#weekSelector').innerHTML = html;
+  currentWeek = weeks[weeks.length-1] || null;
+  $('#weekSelector').querySelectorAll('.week-pill').forEach(p=>{
+    p.addEventListener('click', ()=>{
+      $('#weekSelector').querySelectorAll('.week-pill').forEach(x=>x.classList.remove('on'));
+      p.classList.add('on'); currentWeek = p.dataset.w; renderWeeklyBody();
+    });
+  });
+  renderWeeklyBody();
+}
+function renderWeeklyBody(){
+  const body = $('#weeklyBody');
+  if(!currentWeek){ body.innerHTML = `<div class="empty">暂无周数据</div>`; return; }
+  const items = allItems().filter(i=> (i.week||weekOf(i.date))===currentWeek);
+  const total = items.length;
+  const resolved = items.filter(i=>i.statusNorm==='已解决').length;
+  const unresolved = items.filter(i=>i.statusNorm==='未解决').length;
+  const verifying = items.filter(i=>i.statusNorm==='待验证').length;
+  const progress = items.filter(i=>i.statusNorm==='进行中').length;
+  const byC = {}; items.forEach(i=> byC[i.category]=(byC[i.category]||0)+1);
+  const cats = Object.keys(byC).sort((a,b)=>byC[b]-byC[a]);
+  const meet = (window.KB_DATA.meetings||[]).find(m=>m.week===currentWeek);
+
+  body.innerHTML = `
+    <div class="grid grid-4" style="margin-bottom:16px">
+      <div class="card stat blue"><div class="ico">📋</div><div class="label">本周问题数</div><div class="value">${total}<span class="unit">条</span></div></div>
+      <div class="card stat green"><div class="ico">✅</div><div class="label">本周已解决</div><div class="value">${resolved}<span class="unit">条</span></div><div class="delta">解决率 ${total?Math.round(resolved/total*100):0}%</div></div>
+      <div class="card stat orange"><div class="ico">⏳</div><div class="label">待验证/进行中</div><div class="value">${verifying+progress}<span class="unit">条</span></div><div class="delta">待验证 ${verifying} · 进行中 ${progress}</div></div>
+      <div class="card stat red"><div class="ico">⚠️</div><div class="label">本周未解决</div><div class="value">${unresolved}<span class="unit">条</span></div></div>
+    </div>
+    <div class="grid grid-2" style="margin-bottom:16px">
+      <div class="card">
+        <h3>📌 本周周会纪要</h3>
+        ${meet?`
+          <div style="font-size:12px;color:var(--muted);margin-bottom:10px">${esc(meet.date)} · ${esc(meet.title)}</div>
+          <ul class="meet-list">${meet.points.map(p=>`<li><span class="mk">›</span><span>${esc(p)}</span></li>`).join('')}</ul>`
+        : `<div class="empty" style="padding:26px">本周暂无会议纪要记录</div>`}
+      </div>
+      <div class="card">
+        <h3>🧩 本周问题分类分布</h3>
+        ${cats.length? cats.map((c,i)=>{
+          const col = CATEGORY_COLORS[c]||'#94a3b8';
+          return `<div class="bar-row"><div class="b-label" title="${esc(c)}">${esc(c)}</div><div class="b-track"><div class="b-fill" style="width:${Math.round(byC[c]/Math.max(...cats.map(x=>byC[x]))*100)}%;background:${col}">${byC[c]}</div></div><div class="b-val"></div></div>`;
+        }).join('') : `<div class="empty" style="padding:26px">暂无数据</div>`}
+      </div>
+    </div>
+    <div class="card" style="padding:0">
+      <div style="padding:18px 20px 8px"><h3>本周问题清单</h3></div>
+      <div class="table-wrap" style="border:none;border-top:1px solid var(--border);border-radius:0">
+        <table>
+          <thead><tr><th style="width:70px">编号</th><th>问题</th><th style="width:90px">分类</th><th style="width:90px">优先级</th><th style="width:90px">状态</th><th style="width:120px">负责人</th></tr></thead>
+          <tbody>${items.map(it=>`<tr>
+            <td class="mono">${esc(it.no||'—')}</td>
+            <td><div class="t-title">${esc(it.title)}</div><div style="margin-top:4px;display:flex;gap:5px;flex-wrap:wrap">${(it.dims||[]).map(d=>dimChip(d,false)).join('')}</div>${it.solution?`<div class="t-sub">💡 ${esc(it.solution)}</div>`:''}</td>
+            <td><span class="chip cat-chip">${esc(it.category)}</span></td>
+            <td><span class="chip p-${esc(it.priorityTier)}">${esc(it.priorityTier)}</span></td>
+            <td><span class="chip st-${esc(it.statusNorm)}">${esc(it.statusNorm)}</span></td>
+            <td>${esc(it.owner||'—')}</td>
+          </tr>`).join('')}</tbody>
+        </table>
+      </div>
+    </div>`;
+}
+
+/* ================= 全部问题库 ================= */
+// 版本归属：2.0 = 07/06-08/31（已结束归档）；3.0 = 09/01 起（过渡期预备）
+function verOf(i){
+  if(i.version) return i.version;
+  return (i.date||'') >= '2026-09-01' ? 'v3.0' : 'v2.0';
+}
+function renderLibrary(){
+  const catSel = $('#libCategory');
+  if(catSel.options.length<=1){
+    catSel.innerHTML = `<option value="">全部分类</option>` + (window.KB_DATA.categories||[]).map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join('');
+  }
+  // 折叠交互绑定（静态元素，绑定一次）
+  [['#archiveToggle','#archiveList','#archiveArrow'],['#minorToggle','#minorList','#minorArrow']].forEach(([t,l,a])=>{
+    const el = $(t);
+    if(!el || el._bound) return;
+    el._bound = true;
+    el.addEventListener('click', ()=>{
+      const list = $(l);
+      const show = list.style.display === 'none';
+      list.style.display = show ? 'block' : 'none';
+      el.classList.toggle('open', show);
+      $(a).textContent = show ? '▴' : '▾';
+    });
+  });
+  // 衡量标签下拉填充
+  const dimSel = $('#libDim');
+  if(dimSel && dimSel.options.length<=1){
+    dimSel.innerHTML = `<option value="">全部衡量标签</option>` + DIMS().map(d=>`<option value="${esc(d.key)}">${d.icon} ${esc(d.key)}</option>`).join('');
+  }
+  // 筛选下拉 change 绑定（状态 / 分类 / 优先级 / 衡量标签）
+  ['#libStatus','#libCategory','#libPriority','#libDim'].forEach(sel=>{
+    const el = $(sel);
+    if(!el || el._bound) return;
+    el._bound = true;
+    el.addEventListener('change', renderLibBody);
+  });
+  renderLibBody();
+}
+function filterItems(){
+  const q = ($('#globalSearch').value||'').trim().toLowerCase();
+  const fs = $('#libStatus').value, fc = $('#libCategory').value, fp = $('#libPriority').value;
+  const fd = $('#libDim') ? $('#libDim').value : '';
+  return allItems().filter(i=>{
+    if(fs && i.statusNorm!==fs) return false;
+    if(fc && i.category!==fc) return false;
+    if(fp && i.priorityTier!==fp) return false;
+    if(fd && !(i.dims||[]).includes(fd)) return false;
+    if(libTopicFilter && i.topic!==libTopicFilter) return false;
+    if(q && !((i.title||'').toLowerCase().includes(q)||(i.solution||'').toLowerCase().includes(q)||(i.owner||'').toLowerCase().includes(q)||(i.category||'').toLowerCase().includes(q)||(i.topic||'').toLowerCase().includes(q))) return false;
+    return true;
+  }).sort((a,b)=> (a.no&&b.no? (parseInt(a.no)||0)-(parseInt(b.no)||0) : 0));
+}
+function renderLibTable(list, bodyEl){
+  if(!list.length){ bodyEl.innerHTML = `<tr><td colspan="7"><div class="empty">无匹配记录</div></td></tr>`; return; }
+  bodyEl.innerHTML = list.map(it=>`<tr>
+    <td class="mono">${esc(it.no||'—')}</td>
+    <td><div class="t-title">${esc(it.title)}</div>${it.solution?`<div class="t-sub">💡 ${esc(it.solution)}</div>`:''}${it.source==='手动提交'?`<div class="t-sub">📝 手动提交 · ${esc(it.date||'')}</div>`:''}</td>
+    <td><span class="chip cat-chip">${esc(it.category)}</span></td>
+    <td><span class="chip p-${esc(it.priorityTier)}">${esc(it.priorityTier)}</span></td>
+    <td><span class="chip st-${esc(it.statusNorm)}">${esc(it.statusNorm)}</span></td>
+    <td>${esc(it.owner||'—')}</td>
+    <td><button class="btn sm ghost" data-detail='${esc(JSON.stringify(it))}'>详情</button></td>
+  </tr>`).join('');
+  bodyEl.querySelectorAll('button[data-detail]').forEach(b=>{
+    b.addEventListener('click', ()=>{
+      const it = JSON.parse(b.dataset.detail);
+      $('#modalBox').innerHTML = detailHTML(it);
+      $('#modalMask').classList.add('show');
+      $('#mClose').onclick = ()=> $('#modalMask').classList.remove('show');
+    });
+  });
+}
+function renderLibBody(){
+  const all = filterItems();
+  // 版本大类三分：3.0 预备(未折叠·优先) / 2.0 归档(折叠) / 关联分析库(折叠)
+  const list30 = all.filter(i=> verOf(i)==='v3.0' && i.layer!=='minor');
+  const list20 = all.filter(i=> verOf(i)==='v2.0' && i.layer!=='minor');
+  const minor  = all.filter(i=> i.layer==='minor');
+  $('#v3Count').textContent = `${list30.length} 条 · 未解决 ${list30.filter(i=>i.statusNorm==='未解决').length}`;
+  $('#archiveCount').textContent = `${list20.length} 条`;
+  $('#minorToggleCount').textContent = `${minor.length} 条`;
+  const fdNow = $('#libDim') ? $('#libDim').value : '';
+  $('#libVerHint').textContent = libTopicFilter
+    ? `已按主题「${libTopicFilter}」筛选，三个分区同步生效`
+    : (fdNow ? `已按衡量标签「${fdNow}」筛选，三个分区同步生效`
+             : '按版本大类分区：3.0 预备优先 · 2.0 已结束归档折叠');
+  renderLibTable(list30, $('#libBody'));
+  renderLibTable(list20, $('#archiveBody'));
+  renderLibTable(minor, $('#minorBody'));
+  if(libTopicFilter){
+    // 任一分区命中即给出可清除入口（主列表头部计数）
+    const clear = ()=>{ libTopicFilter = null; $('#globalSearch').value=''; renderLibBody(); };
+    document.querySelectorAll('#libVerHint').forEach(h=>{ h.style.cursor='pointer'; h.title='点击清除主题筛选'; h.onclick = clear; });
+  } else {
+    const h = $('#libVerHint'); h.style.cursor=''; h.title=''; h.onclick = null;
+  }
+}
+function detailHTML(it){
+  return `<h3 style="margin-bottom:4px">问题详情</h3>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:14px">编号 ${esc(it.no||'—')} · 来源 ${esc(it.source||'问题台账')} ${it.date?'· '+esc(it.date):''}</div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">
+      <span class="chip cat-chip">${esc(it.category)}</span>
+      <span class="chip p-${esc(it.priorityTier)}">${esc(it.priorityTier)}</span>
+      <span class="chip st-${esc(it.statusNorm)}">${esc(it.statusNorm)}</span>
+      ${it.owner?`<span class="chip" style="background:var(--bg)">👤 ${esc(it.owner)}</span>`:''}
+    </div>
+    ${(it.dims&&it.dims.length)?`<div style="margin-bottom:14px;display:flex;gap:6px;flex-wrap:wrap">${it.dims.map(d=>dimChip(d,true)).join('')}</div>`:''}
+    <div style="margin-bottom:14px"><div style="font-size:12px;color:var(--muted);margin-bottom:4px">问题描述</div><div style="font-size:14px">${esc(it.title)}</div></div>
+    ${it.solution?`<div style="margin-bottom:14px"><div style="font-size:12px;color:var(--muted);margin-bottom:4px">解决方案</div><div style="background:var(--green-soft);border-radius:10px;padding:12px 14px;font-size:13.5px">${esc(it.solution)}</div></div>`:`<div style="margin-bottom:14px;color:var(--red);font-size:13px">⚠️ 该问题尚未记录解决方案</div>`}
+    ${it.note1||it.note2||it.note3?`<div style="margin-bottom:10px"><div style="font-size:12px;color:var(--muted);margin-bottom:4px">备注</div>
+      <ul style="padding-left:18px;font-size:12.5px;color:var(--muted);line-height:1.8">
+        ${[it.note1,it.note2,it.note3].filter(Boolean).map(n=>`<li>${esc(n)}</li>`).join('')}
+      </ul></div>`:''}
+    <div class="btn-row" style="margin-top:14px"><button class="btn primary" id="mClose">关闭</button></div>`;
+}
+
+/* ================= 网络图谱 ================= */
+let graphState = {nodes:[], edges:[], transform:{x:0,y:0,k:1}, running:true, drag:null, hover:null, layout:'force'};
+
+// 负责人归一化：合并别名（张明/小明），去括号注释，过滤非人名
+const OWNER_ALIASES = {
+  '小明': '张明', '张明': '张明', '李倩': '李倩', '王浩': '王浩',
+  '赵雪': '赵雪', '陈磊': '陈磊', '周涛': '周涛',
+  '孙悦': '孙悦', '吴斌': '吴斌', '郑楠': '郑楠'
+};
+const OWNER_NON_PERSON = new Set(['美术调整','美术','bug','S','A','SSS','已完成','进行中','待验证','其他','无']);
+function normalizeOwners(raw){
+  if(!raw) return [];
+  let s = String(raw).replace(/&#10;/g,'\n').replace(/&#13;/g,'\r').replace(/&nbsp;/g,' ');
+  s = s.replace(/[（(][^）)]*[）)]/g, '');   // 去掉括号注释，如「张明（补 1 张整图）」
+  return s.split(/[，,、\n\r]+/)
+    .map(p=> p.trim())
+    .map(p=> OWNER_ALIASES[p] || p)          // 别名归一
+    .filter(p=> p && !OWNER_NON_PERSON.has(p));
+}
+function allOwnerNames(items){
+  const set = new Set();
+  (items||[]).forEach(i=> normalizeOwners(i.owner).forEach(n=> set.add(n)));
+  return Array.from(set).sort((a,b)=> a.localeCompare(b,'zh'));
+}
+
+function buildGraph(){
+  // 图谱只承载有通用性质的高价值问题；默认优先展示 3.0 预备，2.0 归档可通过版本下拉查看
+  const verFilter = $('#graphVersion') ? $('#graphVersion').value : 'all';
+  let items = allItems().filter(i=> i.layer!=='minor');
+  if(verFilter!=='all') items = items.filter(i=> verOf(i)===verFilter);
+  const dimSel = $('#graphDimension');
+  const dimAxis = dimSel ? dimSel.value : 'all';
+  const ownerFilter = $('#graphOwner').value;
+  const nodes = [], edges = [];
+  const nodeMap = new Map();
+  function addNode(id, type, label, meta){
+    if(nodeMap.has(id)) return nodeMap.get(id);
+    const n = {id, type, label, meta, x:Math.random()*800, y:Math.random()*600, vx:0, vy:0, r:0};
+    nodeMap.set(id, n); nodes.push(n); return n;
+  }
+  // 先按筛选条件过滤问题
+  const filtered = items.filter(i=>{
+    if(dimAxis!=='all' && !(i.dims||[]).includes(dimAxis)) return false;
+    if(ownerFilter!=='all' && !normalizeOwners(i.owner).includes(ownerFilter)) return false;
+    return true;
+  });
+  // 六维衡量标签节点（仅出现于筛选结果中的），颜色取自维度定义
+  const cats = new Set();
+  if(dimAxis!=='all') cats.add(dimAxis);                      // 选定维度 → 单一轴心，口径清晰
+  else filtered.forEach(i=> (i.dims||[]).forEach(d=> cats.add(d)));
+  const dmv = DIM_MAP();
+  cats.forEach(c=>{
+    const nd = addNode('dim:'+c, 'category', c);
+    nd.dimKey = c;
+    nd.color = (dmv[c] && dmv[c].color) || '#8b5cf6';
+  });
+  // owners（仅出现于筛选结果中的，已归一化）
+  const owners = new Set();
+  filtered.forEach(i=> normalizeOwners(i.owner).forEach(n=> owners.add(n)));
+  owners.forEach(o=>{
+    const on = addNode('owner:'+o, 'owner', o);
+    if(ownerFilter!=='all' && o===ownerFilter) on.highlight = true;  // 聚焦的负责人高亮
+  });
+  // problems + solutions
+  filtered.forEach(i=>{
+    const pn = addNode('p:'+i.id, 'problem', i.title, i);
+    (i.dims||[]).forEach(d=>{
+      const cn = nodeMap.get('dim:'+d);
+      if(cn) edges.push([cn.id, pn.id]);
+    });
+    normalizeOwners(i.owner).forEach(o=>{
+      const on = nodeMap.get('owner:'+o);
+      if(on) edges.push([pn.id, on.id]);
+    });
+    if(i.solution){
+      const sn = addNode('s:'+i.id, 'solution', i.solution, i);
+      edges.push([pn.id, sn.id]);
+    }
+  });
+  // remove isolated categories/owners with no edges
+  const connected = new Set();
+  edges.forEach(e=>{connected.add(e[0]); connected.add(e[1]);});
+  const kept = nodes.filter(n=> n.type==='problem'||n.type==='solution'||connected.has(n.id));
+  const keptSet = new Set(kept.map(n=>n.id));
+  const keptEdges = edges.filter(e=> keptSet.has(e[0])&&keptSet.has(e[1]));
+  return {nodes:kept, edges:keptEdges};
+}
+
+function renderGraph(){
+  const sel = $('#graphDimension');
+  if(sel && sel.options.length <= 1){
+    const cur = sel.value;
+    sel.innerHTML = `<option value="all">全部衡量标签</option>` + DIMS().map(d=>`<option value="${esc(d.key)}">${d.icon} ${esc(d.key)}（${d.itemCount} 条）</option>`).join('');
+    if([...sel.options].some(o=> o.value===cur)) sel.value = cur;
+  }
+  // 填充负责人下拉（归一化后的名单），并保留当前选中项
+  const osel = $('#graphOwner');
+  const curOwner = osel.value || 'all';
+  osel.innerHTML = `<option value="all">全部负责人</option>` + allOwnerNames(allItems()).map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join('');
+  if([...osel.options].some(o=> o.value===curOwner)) osel.value = curOwner;
+  else osel.value = 'all';
+
+  const g = buildGraph();
+  graphState.nodes = g.nodes; graphState.edges = g.edges;
+  graphState.layout = $('#graphLayout').value;
+  initGraphLayout();
+  drawGraph();
+}
+
+function initGraphLayout(){
+  const nodes = graphState.nodes, edges = graphState.edges;
+  const W = 1800, H = 1300;
+  if(graphState.layout==='radial'){
+    const cats = nodes.filter(n=>n.type==='category');
+    const cxc = W/2, cyc = H/2, cr = Math.min(W,H)*0.28;
+    const nC = Math.max(cats.length,1), nO = Math.max(nodes.filter(n=>n.type==='owner').length,1);
+    cats.forEach((n,i)=>{ n.x = cxc + cr*Math.cos(2*Math.PI*i/nC); n.y = cyc + cr*Math.sin(2*Math.PI*i/nC); });
+    // problems near their category, spread wider
+    nodes.filter(n=>n.type==='problem').forEach(n=>{
+      const catEdge = edges.find(e=> e[1]===n.id && e[0].startsWith('cat:'));
+      const cat = catEdge? nodes.find(x=>x.id===catEdge[0]) : null;
+      if(cat){ const a = Math.random()*2*Math.PI, rr = 140+Math.random()*260; n.x = cat.x + rr*Math.cos(a); n.y = cat.y + rr*Math.sin(a); }
+      else { n.x = Math.random()*W; n.y = Math.random()*H; }
+    });
+    // owners outer ring
+    const orad = cr + 260;
+    nodes.filter(n=>n.type==='owner').forEach((n,i)=>{ n.x = cxc + orad*Math.cos(2*Math.PI*i/nO); n.y = cyc + orad*Math.sin(2*Math.PI*i/nO); });
+    // solutions near their problem
+    nodes.filter(n=>n.type==='solution').forEach(n=>{
+      const pe = edges.find(e=> e[1]===n.id);
+      const p = pe? nodes.find(x=>x.id===pe[0]) : null;
+      if(p){ n.x = p.x + 55; n.y = p.y + 55; }
+    });
+    runForce(90);
+  } else {
+    nodes.forEach(n=>{ n.x = W/2 + (Math.random()-0.5)*800; n.y = H/2 + (Math.random()-0.5)*800; });
+    runForce(260);
+  }
+  fitGraph();
+}
+
+function runForce(iters){
+  const nodes = graphState.nodes, edges = graphState.edges;
+  const idx = new Map(nodes.map(n=>[n.id,n]));
+  const W = 1800, H = 1300;
+  const rep = 18000, springL = 140, springK = 0.04, gravity = 0.015;
+  const cellSize = 130; // grid bucketing for O(n) repulsion
+  for(let t=0; t<iters; t++){
+    // build grid
+    const grid = new Map();
+    for(let i=0;i<nodes.length;i++){
+      const n = nodes[i];
+      const cx = Math.floor(n.x/cellSize), cy = Math.floor(n.y/cellSize);
+      const key = cx+'|'+cy;
+      let arr = grid.get(key);
+      if(!arr){ arr = []; grid.set(key, arr); }
+      arr.push(i);
+    }
+    // repulsion via grid (3x3 neighbor cells)
+    for(let i=0;i<nodes.length;i++){
+      const a = nodes[i];
+      const cx = Math.floor(a.x/cellSize), cy = Math.floor(a.y/cellSize);
+      for(let dx=-1;dx<=1;dx++) for(let dy=-1;dy<=1;dy++){
+        const arr = grid.get((cx+dx)+'|'+(cy+dy));
+        if(!arr) continue;
+        for(let k=0;k<arr.length;k++){
+          const j = arr[k];
+          if(j===i) continue;
+          const b = nodes[j];
+          let ddx = a.x-b.x, ddy = a.y-b.y;
+          let d2 = ddx*ddx+ddy*ddy;
+          if(d2<1){ ddx=(Math.random()-0.5); ddy=(Math.random()-0.5); d2=1; }
+          const d = Math.sqrt(d2);
+          const f = rep/Math.max(d2,90);
+          const fx = ddx/d*f, fy = ddy/d*f;
+          a.vx+=fx; a.vy+=fy;
+        }
+      }
+    }
+    // springs
+    edges.forEach(e=>{
+      const a = idx.get(e[0]), b = idx.get(e[1]);
+      if(!a||!b) return;
+      let dx = b.x-a.x, dy = b.y-a.y; const d = Math.sqrt(dx*dx+dy*dy)||1;
+      const f = (d-springL)*springK; const fx = dx/d*f, fy = dy/d*f;
+      a.vx+=fx; a.vy+=fy; b.vx-=fx; b.vy-=fy;
+    });
+    // integrate
+    nodes.forEach(n=>{
+      n.vx = n.vx*0.82 + (W/2-n.x)*gravity*0.02;
+      n.vy = n.vy*0.82 + (H/2-n.y)*gravity*0.02;
+      n.x += n.vx; n.y += n.vy;
+      n.vx*=0.9; n.vy*=0.9;
+    });
+  }
+}
+
+function fitGraph(){
+  const nodes = graphState.nodes; if(!nodes.length) return;
+  const wrap = $('#graphWrap');
+  const W = wrap.clientWidth, H = wrap.clientHeight;
+  let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
+  nodes.forEach(n=>{ minX=Math.min(minX,n.x);minY=Math.min(minY,n.y);maxX=Math.max(maxX,n.x);maxY=Math.max(maxY,n.y); });
+  const bw = maxX-minX||1, bh = maxY-minY||1;
+  const k = Math.min(W/bw, H/bh, 1.4)*0.9;
+  const cx = (minX+maxX)/2, cy = (minY+maxY)/2;
+  graphState.transform = { x: W/2 - cx*k, y: H/2 - cy*k, k };
+}
+
+function drawGraph(){
+  const canvas = $('#graphCanvas'); const wrap = $('#graphWrap');
+  const W = wrap.clientWidth, H = wrap.clientHeight;
+  const dpr = window.devicePixelRatio||1;
+  canvas.width = W*dpr; canvas.height = H*dpr; canvas.style.width=W+'px'; canvas.style.height=H+'px';
+  const ctx = canvas.getContext('2d'); ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.clearRect(0,0,W,H);
+  const {x:tx,y:ty,k} = graphState.transform;
+  const idx = new Map(graphState.nodes.map(n=>[n.id,n]));
+  function PX(n){ return tx + n.x*k; }
+  function PY(n){ return ty + n.y*k; }
+  // edges
+  graphState.edges.forEach(e=>{
+    const a = idx.get(e[0]), b = idx.get(e[1]);
+    if(!a||!b) return;
+    ctx.beginPath(); ctx.moveTo(PX(a),PY(a)); ctx.lineTo(PX(b),PY(b));
+    ctx.strokeStyle = '#d4dae8'; ctx.lineWidth = 1; ctx.stroke();
+  });
+  // nodes
+  const drawNode = (n)=>{
+    const x = PX(n), y = PY(n);
+    if(x<-50||x>W+50||y<-50||y>H+50) return;
+    let r, fill, stroke;
+    if(n.type==='category'){ r=16; fill = n.color || '#8b5cf6'; }
+    else if(n.type==='owner'){ r = n.highlight ? 15 : 11; fill='#0d9488'; }
+    else if(n.type==='solution'){ r=9; fill='#16a34a'; }
+    else { r = n.meta && n.meta.statusNorm ? 7 : 7; fill = n.meta? (STATUS_COLORS[n.meta.statusNorm]||'#cbd5e1') : '#cbd5e1'; }
+    const isHover = graphState.hover===n;
+    // 聚焦负责人：加光晕
+    if(n.type==='owner' && n.highlight){
+      ctx.beginPath(); ctx.arc(x,y,r+7,0,2*Math.PI);
+      ctx.fillStyle = 'rgba(13,148,136,0.18)'; ctx.fill();
+      ctx.beginPath(); ctx.arc(x,y,r+4,0,2*Math.PI);
+      ctx.strokeStyle = '#0d9488'; ctx.lineWidth = 2; ctx.stroke();
+    }
+    ctx.beginPath(); ctx.arc(x,y,isHover?r+3:r,0,2*Math.PI);
+    ctx.fillStyle = fill; ctx.fill();
+    if(isHover){ ctx.lineWidth=2; ctx.strokeStyle='#111a33'; ctx.stroke(); }
+    if(n.type==='category'||n.type==='owner'){
+      ctx.fillStyle = '#fff'; ctx.font = `${n.type==='category'||n.highlight?12:10}px -apple-system,sans-serif`;
+      ctx.textAlign='center'; ctx.textBaseline='middle';
+      const label = n.label.length>8? n.label.slice(0,8)+'…': n.label;
+      ctx.fillText(label, x, y);
+    }
+    if(n.type==='category'||n.type==='owner'){
+      ctx.fillStyle = '#334'; ctx.font='11px -apple-system,sans-serif'; ctx.textAlign='center';
+      ctx.fillText(n.label.length>10?n.label.slice(0,10)+'…':n.label, x, y+r+13);
+    }
+  };
+  graphState.nodes.forEach(drawNode);
+}
+
+/* graph interactions */
+function graphPos(evt){
+  const r = $('#graphCanvas').getBoundingClientRect();
+  return { x: evt.clientX-r.left, y: evt.clientY-r.top };
+}
+function pickNode(p){
+  const {x:tx,y:ty,k} = graphState.transform;
+  for(let i=graphState.nodes.length-1;i>=0;i--){
+    const n = graphState.nodes[i];
+    const dx = p.x-(tx+n.x*k), dy = p.y-(ty+n.y*k);
+    const rr = (n.type==='category'?16:n.type==='owner'?(n.highlight?15:11):n.type==='solution'?9:7)+4;
+    if(dx*dx+dy*dy <= rr*rr) return n;
+  }
+  return null;
+}
+
+(function bindGraph(){
+  const wrap = $('#graphWrap'), canvas = $('#graphCanvas');
+  let panning=false, panStart=null;
+  wrap.addEventListener('mousedown', e=>{
+    const p = graphPos(e); const n = pickNode(p);
+    if(n){ graphState.drag = {node:n, dx: p.x-(graphState.transform.x+n.x*graphState.transform.k), dy: p.y-(graphState.transform.y+n.y*graphState.transform.k)}; wrap.classList.add('dragging'); }
+    else { panning=true; panStart={x:e.clientX,y:e.clientY, tx:graphState.transform.x, ty:graphState.transform.y}; wrap.style.cursor='grabbing'; }
+  });
+  window.addEventListener('mousemove', e=>{
+    if(!$('#view-graph').classList.contains('active')) return;
+    const p = graphPos(e);
+    if(graphState.drag){
+      const n = graphState.drag.node;
+      n.x = (p.x - graphState.drag.dx - graphState.transform.x)/graphState.transform.k;
+      n.y = (p.y - graphState.drag.dy - graphState.transform.y)/graphState.transform.k;
+      drawGraph();
+    } else if(panning){
+      graphState.transform.x = panStart.tx + (e.clientX-panStart.x);
+      graphState.transform.y = panStart.ty + (e.clientY-panStart.y);
+      drawGraph();
+    } else {
+      const n = pickNode(p);
+      if(n!==graphState.hover){
+        graphState.hover = n; drawGraph();
+        const tip = $('#nodeTip');
+        if(n){
+          const r = canvas.getBoundingClientRect();
+          tip.style.display='block'; tip.style.left=(p.x+14)+'px'; tip.style.top=(p.y+14)+'px';
+          const meta = n.meta||{};
+          const typeLabel = n.type==='category'?'衡量标签':n.type==='owner'?'负责人':n.type==='solution'?'解决方案':'问题';
+          tip.innerHTML = `<div class="nt-t">${typeLabel} · ${esc(n.label)}</div>`+
+            (meta.statusNorm?`<div class="nt-m">状态：${esc(meta.statusNorm)}${meta.owner?' · 负责人：'+esc(meta.owner):''}</div>`:'')+
+            (n.type==='solution'?`<div class="nt-m">${esc(n.label)}</div>`:'');
+        } else { tip.style.display='none'; }
+      }
+    }
+  });
+  window.addEventListener('mouseup', ()=>{ graphState.drag=null; panning=false; wrap.classList.remove('dragging'); wrap.style.cursor='grab'; });
+  wrap.addEventListener('wheel', e=>{
+    e.preventDefault();
+    const p = graphPos(e);
+    const factor = e.deltaY<0? 1.12 : 1/1.12;
+    const k = Math.min(Math.max(graphState.transform.k*factor, 0.2), 6);
+    graphState.transform.x = p.x - (p.x-graphState.transform.x)*(k/graphState.transform.k);
+    graphState.transform.y = p.y - (p.y-graphState.transform.y)*(k/graphState.transform.k);
+    graphState.transform.k = k;
+    drawGraph();
+  }, {passive:false});
+})();
+
+$('#graphVersion').addEventListener('change', renderGraph);
+$('#graphDimension').addEventListener('change', renderGraph);
+$('#graphOwner').addEventListener('change', renderGraph);
+$('#graphLayout').addEventListener('change', renderGraph);
+$('#btnGraphFit').addEventListener('click', ()=>{ fitGraph(); drawGraph(); });
+window.addEventListener('resize', ()=>{ if($('#view-graph').classList.contains('active')) drawGraph(); });
+
+/* ================= AI 接入 ================= */
+const AI_API = [
+  {m:'GET', c:'#16a34a', name:'KnowledgeBaseAI.getData()', desc:'返回全部知识条目（问题台账 + 手动提交），供 AI 读取现状'},
+  {m:'POST', c:'#4f6ef7', name:'KnowledgeBaseAI.addItem(item)', desc:'新增一条问题/方案记录，item 字段：title/category/priorityTier/owner/statusNorm/solution/date'},
+  {m:'PATCH', c:'#f59e0b', name:'KnowledgeBaseAI.updateItem(id, patch)', desc:'更新指定条目（如补交 solution 并置为已解决）'},
+  {m:'POST', c:'#8b5cf6', name:'KnowledgeBaseAI.query(filter)', desc:'按 status/category/priority/week 条件检索条目'},
+  {m:'GET', c:'#14b8a6', name:'KnowledgeBaseAI.getProjectIssues()', desc:'返回「项目问题时间轴」数据（分析提炼 + 手动提交）'},
+  {m:'POST', c:'#e11d48', name:'KnowledgeBaseAI.addProjectIssue(issue)', desc:'新增项目级问题，四段式字段：title/goal/ksf[]/solution/review + category/severity/status/date'},
+  {m:'POST', c:'#e11d48', name:'KnowledgeBaseAI.sync()', desc:'触发一次远端 AI 同步，把本地数据 POST 到配置的 endpoint'},
+  {m:'GET', c:'#0d9488', name:'KnowledgeBaseAI.getConfig() / setConfig(cfg)', desc:'读写 AI 服务配置 {endpoint, apiKey, model}'},
+];
+
+window.KnowledgeBaseAI = {
+  version: '1.1.0',
+  getData(){ return allItems(); },
+  addItem(item){
+    const it = Object.assign({id:uid(), status:'', source:'AI', statusNorm: item.statusNorm||'未解决'}, item);
+    userItems.push(it); saveUserItems(userItems); return it;
+  },
+  updateItem(id, patch){
+    let it = userItems.find(x=>x.id===id);
+    if(!it){ it = {id, source:'AI', statusNorm:'未解决'}; userItems.push(it); }
+    Object.assign(it, patch); saveUserItems(userItems); return it;
+  },
+  query(filter){
+    filter = filter||{};
+    return allItems().filter(i=>{
+      if(filter.status && i.statusNorm!==filter.status) return false;
+      if(filter.category && i.category!==filter.category) return false;
+      if(filter.priority && i.priorityTier!==filter.priority) return false;
+      if(filter.keyword && !((i.title||'').includes(filter.keyword)||(i.solution||'').includes(filter.keyword))) return false;
+      return true;
+    });
+  },
+  getProjectIssues(){ return allProjectIssues(); },
+  addProjectIssue(issue){
+    const it = Object.assign({id:uid(), status: issue.status||'未解决', source: issue.source||'AI'}, issue);
+    userProjectIssues.push(it); saveProjectIssues(userProjectIssues); return it;
+  },
+  updateProjectIssue(id, patch){
+    let it = userProjectIssues.find(x=>x.id===id);
+    if(!it){ it = {id, source:'AI', status:'未解决'}; userProjectIssues.push(it); }
+    Object.assign(it, patch); saveProjectIssues(userProjectIssues); return it;
+  },
+  getConfig(){ try{ return JSON.parse(safeStorage.get(LS_AI))||{}; }catch(e){ return {}; } },
+  setConfig(cfg){ safeStorage.set(LS_AI, JSON.stringify(cfg)); return cfg; },
+  async sync(){
+    const cfg = this.getConfig();
+    if(!cfg.endpoint){ throw new Error('未配置 AI 接口端点'); }
+    const res = await fetch(cfg.endpoint, {
+      method:'POST',
+      headers: Object.assign({'Content-Type':'application/json'}, cfg.apiKey?{'Authorization':'Bearer '+cfg.apiKey}:{}),
+      body: JSON.stringify({action:'sync_knowledge', data: allItems(), projectIssues: allProjectIssues(), model: cfg.model, ts: Date.now()})
+    });
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    return await res.json();
+  }
+};
+
+function renderAI(){
+  $('#apiList').innerHTML = AI_API.map(a=>`
+    <div class="api-item"><div class="m" style="--methodC:${a.c}">${a.m}</div>
+      <div class="d"><div class="an">${esc(a.name)}</div><div class="ad">${esc(a.desc)}</div></div>
+    </div>`).join('');
+  const cfg = window.KnowledgeBaseAI.getConfig();
+  $('#aiEndpoint').value = cfg.endpoint||''; $('#aiKey').value = cfg.apiKey||''; $('#aiModel').value = cfg.model||'';
+  $('#apiSample').textContent =
+`// 1) 读取知识库现状
+const items = window.KnowledgeBaseAI.getData();
+
+// 2) 新增一条问题（未解决，后续补交）
+const id = window.KnowledgeBaseAI.addItem({
+  title: '某系统新问题描述',
+  category: '装备系统',
+  priorityTier: '高',
+  owner: '张明',
+  statusNorm: '未解决'
+});
+
+// 3) 补交解决方案
+window.KnowledgeBaseAI.updateItem(id, {
+  solution: '具体解决方案…',
+  statusNorm: '已解决',
+  resolvedAt: '2026-09-02'
+});
+
+// 4) 条件检索
+const unresolved = window.KnowledgeBaseAI.query({ status:'未解决' });
+
+// 5) 项目问题时间轴：读取 + 新增（畅游方法论四段式）
+const issues = window.KnowledgeBaseAI.getProjectIssues();
+const pid = window.KnowledgeBaseAI.addProjectIssue({
+  title: '无尽模式性能瓶颈',
+  goal: '保障体验测试流畅运行、消除卡顿',
+  ksf: ['程序全力性能优化', '缺失资源落实到位', '流畅度达标'],
+  category: '性能优化',
+  severity: '高',
+  status: '未解决'
+});
+window.KnowledgeBaseAI.updateProjectIssue(pid, {
+  solution: '定点优化 + 资源对接',
+  review: '体验测试跑测流畅度是否达标',
+  status: '已解决'
+});
+
+// 6) 触发一次远端同步
+await window.KnowledgeBaseAI.sync();`;
+}
+
+$('#btnSaveAi').addEventListener('click', ()=>{
+  window.KnowledgeBaseAI.setConfig({endpoint:$('#aiEndpoint').value.trim(), apiKey:$('#aiKey').value.trim(), model:$('#aiModel').value.trim()});
+  toast('AI 配置已保存','ok');
+});
+$('#btnTestAi').addEventListener('click', async ()=>{
+  const cfg = window.KnowledgeBaseAI.getConfig();
+  if(!cfg.endpoint){ toast('请先填写接口端点','err'); return; }
+  try{
+    const res = await fetch(cfg.endpoint, {method:'GET', headers: cfg.apiKey?{'Authorization':'Bearer '+cfg.apiKey}:{}});
+    toast(res.ok?'连接成功，AI 服务可达 ✅':'服务返回 HTTP '+res.status,'ok');
+  }catch(e){ toast('连接失败：'+e.message,'err'); }
+});
+$('#btnAiSync').addEventListener('click', async ()=>{
+  try{ await window.KnowledgeBaseAI.sync(); toast('AI 同步请求已发送 ✅','ok'); }
+  catch(e){ toast('同步失败：'+e.message,'err'); }
+});
+
+/* ================= 全局搜索 ================= */
+$('#globalSearch').addEventListener('input', ()=>{
+  switchView('dashboard');
+  renderLibBody();
+});
+
+/* ================= 初始化 ================= */
+$('#todayLabel').textContent = '📅 ' + new Date().toLocaleDateString('zh-CN',{year:'numeric',month:'long',day:'numeric',weekday:'long'});
+switchView('insight');   // 项目提炼为最高优先级默认板块
+</script>
+</body>
+</html>

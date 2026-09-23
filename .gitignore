@@ -1,0 +1,15 @@
+# 系统与编辑器
+.DS_Store
+Thumbs.db
+desktop.ini
+*.tmp
+~$*
+
+# 不纳入版本控制的文件类型
+*.xlsx
+*.xls
+!docs/*.docx
+
+# 构建中转
+__pycache__/
+*.log
