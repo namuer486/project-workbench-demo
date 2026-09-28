@@ -1,11 +1,13 @@
 ---
 name: ipd-report-json
-description: 将游戏项目 IPD 研究或用研报告与开发问题资料整理为项目工作台可导入的 report.json，保留六维原始数值、具体案例、问题关联和原文依据。用于报告结构化、生成或更新工作台 JSON，不负责部署网站或生成网页代码。
+description: 将游戏项目 IPD 研究或用研报告与开发问题资料整理为项目工作台可导入的 report.json，将六维评价和具体案例作为输入，关联开发明细、项目级问题与通用经验，保留原文依据。用于项目拆解、生成或更新工作台 JSON，不负责部署网站或生成网页代码。
 ---
 
-# IPD 报告转工作台 JSON
+# 从 IPD 资料生成项目拆解 JSON
 
-输入是用户给出的报告和可选开发问题清单，输出是符合 [report.schema.json](references/report.schema.json) 的 UTF-8 `report.json`。先阅读 [字段与提取规则](references/contract.md)，需要完整格式例子时参考 [示例 JSON](references/example-report.json)；其原始材料在 [示例输入](references/example-input.md)，全部是合成数据，不可带入真实输出。
+输入是用户给出的报告和可选开发问题清单，输出是符合 v2 [project.schema.json](references/project.schema.json) 的 UTF-8 `report.json`。先阅读 [字段与提取规则](references/contract.md)，需要完整格式例子时参考 [项目拆解示例 JSON](references/example-project.json)；其原始材料在 [示例输入](references/example-input.md)，全部是合成数据，不可带入真实输出。
+
+输出的中心是项目拆解，不是独立报告阅读页。报告与问题表都是输入；输出贯通“研究发现与开发明细 → 项目级问题 → 通用性提炼”。`study` 仅保存研究来源背景。文件名为兼容构建仍使用 `report.json`，新生成固定 `schemaVersion: "2.0"`。
 
 ## 提取流程
 
@@ -13,7 +15,10 @@ description: 将游戏项目 IPD 研究或用研报告与开发问题资料整�
 2. 提取六维原始指标、研究方法和样本量，再整理具体案例。每个非空数值和事实案例通过 `evidenceRefs` 关联到来源中的短摘录和可核对位置。定位优先用章节、表名、题号、行号；只有查看过渲染页码才写页码。
 3. 单独整理开发问题。保留已有问题编号、负责人、日期、状态和方案；没有问题清单就输出 `issues: []`。报告中提到的体验问题可作为案例，不能直接虚构为已有开发任务。
 4. 按 ID 关联案例和实际开发问题。明确属于哪个维度才加标签；不确定的关联留空并记入 `openQuestions`。更新时复用已有来源、指标、案例和问题 ID，输入旧 JSON 时保留仍有依据的条目。
-5. 生成 `report.json`，运行 `python scripts/validate.py <report.json>`。修复结构或关联错误再交付。有运行环境就实际校验；只有聊天环境时自检并明确未运行脚本，不声称校验通过。
+5. 将研究案例和开发明细汇总为 `projectProblems`：围绕同一体验目标或系统能力组织，展开目标 `goal`、关键成功因素 `ksf`、方案 `solution`、复盘 `review`，引用案例和明细 ID。项目级问题与开发任务分层；不要把明细日期、负责人、状态直接当成项目级状态。未明确提供的事实字段留空；从材料推导的目标或方案标 `origin: "ai"`，至少关联一条支持依据。没有复盘就保留 null，不把方案写成已验证成效。
+6. 跨案例/问题提炼 `insights`：表达可复用经验或待验证假设，提供 `summary`、`keyPoints`、`theme`，并关联 `projectProblemIds`、`issueIds`、`caseIds`。不能只按六维分组后改写标题。区分“同一个现象在报告与问题表中重复出现”和“多个独立案例中的共性”；证据不足时不要声称反复发生或系统性根因。只保留有依据的条目；不强凑条数。关联明细为支撑该提炼的实际记录，不能把整个项目都挂到每条结论下。
+7. 由材料填写 `ipd.stages/focus/nextInputs`。未知阶段进度不套用模板，最多一个当前阶段。所有阶段状态都有原文依据；当前重点与下一轮验证建议注明 source/ai。统计数量、未闭环数量和明细负责人由平台沿 ID 计算，不写重复统计字段。
+8. 生成 `report.json`，运行 `python scripts/validate.py <report.json>`。修复结构或关联错误再交付。有运行环境就实际校验；只有聊天环境时自检并明确未运行脚本，不声称校验通过。
 
 ## 不可混淆的数据
 

@@ -23,7 +23,8 @@ def load_json(path):
 
 
 def validate(report):
-    schema = load_json(SKILL_ROOT / "references" / "report.schema.json")
+    schema_name = "project.schema.json" if isinstance(report, dict) and report.get("schemaVersion") == "2.0" else "report.schema.json"
+    schema = load_json(SKILL_ROOT / "references" / schema_name)
     errors = []
 
     def check(value, rule, path):
@@ -137,6 +138,34 @@ def validate(report):
             errors.append(issue["id"] + ": 解决日期早于提出日期")
     for question in report["openQuestions"]:
         refs(question["sourceIds"], source_ids, question["id"] + ".sourceIds")
+    if report["schemaVersion"] == "2.0":
+        cases = {c["id"] for c in report["cases"]}
+        problems = unique_ids(report["projectProblems"], "projectProblems")
+        unique_ids(report["insights"], "insights")
+        unique_ids(report["ipd"]["stages"], "ipd.stages")
+        if sum(s["state"] == "current" for s in report["ipd"]["stages"]) > 1:
+            errors.append("ipd.stages: 最多一个当前阶段")
+        def content(value, label):
+            if value is not None:
+                refs(value["evidenceRefs"], evidence_ids, label, True)
+        for stage in report["ipd"]["stages"]:
+            refs(stage["evidenceRefs"], evidence_ids, stage["id"], True)
+        for value in report["ipd"]["focus"] + report["ipd"]["nextInputs"]:
+            content(value, "ipd")
+        for item in report["projectProblems"] + report["insights"]:
+            refs(item["dimensionIds"], dimension_ids, item["id"])
+            refs(item["issueIds"], issue_ids, item["id"])
+            refs(item["caseIds"], cases, item["id"])
+            if not item["issueIds"] and not item["caseIds"]:
+                errors.append(item["id"] + ": 必须关联研究案例或开发明细")
+        for problem in report["projectProblems"]:
+            refs(problem["evidenceRefs"], evidence_ids, problem["id"], True)
+            for value in [problem["goal"], problem["solution"], problem["review"], *problem["ksf"]]:
+                content(value, problem["id"])
+        for insight in report["insights"]:
+            refs(insight["projectProblemIds"], problems, insight["id"])
+            for value in [insight["summary"], *insight["keyPoints"]]:
+                content(value, insight["id"])
     return errors
 
 

@@ -23,7 +23,7 @@ function loginPage(){
 async function staticProject(id){
   const res=await fetch('./data/'+encodeURIComponent(id)+'.json',{cache:'no-store'});
   if(!res.ok)throw new Error('无法读取项目数据，请检查构建是否完成');
-  state.report=null;state.localReport=false;Object.assign(state,await res.json());state.view=state.report?'report':'overview';state.reportDimension='';state.filters={};state.page=1;render();
+  state.report=null;state.localReport=false;Object.assign(state,await res.json());state.view=state.report?'report':'overview';state.reportDimension='';state.filters={};state.problemIds=null;state.relationTitle='';state.page=1;render();
 }
 async function boot(){
   if(state.static){
@@ -52,13 +52,14 @@ async function loadProjects(preferred){
 }
 async function loadProject(id){
   state.report=null;state.localReport=false;Object.assign(state,await api('/api/projects/'+id));if(state.view==='report')state.view='overview';
-  state.upload=null;state.preview=null;state.file=null;state.filters={};state.page=1;
+  state.upload=null;state.preview=null;state.file=null;state.filters={};state.problemIds=null;state.relationTitle='';state.page=1;
   render();
 }
 function render(){
-  const p=state.project, available=(state.report?[['report','◈','IPD 研究报告']]:[]).concat(nav.filter(n=>!readonly()||!['imports','settings'].includes(n[0])).concat(state.static?[['source','⇧','仓库数据']]:[]));
+  const p=state.project, available=(state.report?[['report','◈','项目提炼']]:[]).concat(nav.filter(n=>!readonly()||!['imports','settings'].includes(n[0])).concat(state.static?[['source','⇧','仓库数据']]:[]));
+  if(state.report){const timelineNav=available.find(n=>n[0]==='timeline');if(timelineNav)available[available.indexOf(timelineNav)]=['timeline','◷','项目问题时间轴'];}
   const title=available.find(n=>n[0]===state.view)?.[2]||'项目概览';
-  $('#app').innerHTML=`<div class="shell"><aside class="sidebar"><div class="brand"><span class="logo">◫</span>项目工作台</div><label for="project-select">当前项目 / PROJECT</label>${state.share||state.localReport?`<div class="project-name">${esc(p.name)}</div>`:`<select id="project-select" aria-label="切换项目"><option value="" ${p?'hidden':''}>选择项目</option>${state.projects.map(v=>`<option value="${v.id}" ${v.id===p?.id?'selected':''}>${esc(v.name)}</option>`).join('')}</select><button class="new-project" data-action="new-project">＋ ${state.static?'生成项目配置':'创建项目'}</button>`}<button class="new-project report-import-button" data-action="load-report">导入报告 JSON</button><input id="report-file" type="file" accept=".json" hidden><nav class="nav" aria-label="主导航">${available.map(([id,icon,name])=>`<button data-view="${id}" class="${state.view===id?'active':''}" ${p?'':'disabled'}><span class="nav-icon">${icon}</span>${name}</button>`).join('')}</nav><div class="sidebar-foot"><i class="dot"></i> ${readonly()?'项目只读视图':'表格维护 · 看板同步'}<p class="small">每一项进展，都有数据依据</p></div></aside><main class="main"><header class="topbar"><div class="crumb">工作空间 &nbsp;/&nbsp; <b>${esc(p?.name||'欢迎使用')}</b> &nbsp;/&nbsp; ${title}</div><div class="topbar-right"><span class="small muted">${readonly()?'只读看板':'项目管理员'}</span><span class="avatar">${readonly()?'阅':'管'}</span>${!readonly()?'<button class="subtle small" data-action="logout">退出</button>':''}</div></header>${state.localReport?'<div class="share-head">当前是本地 JSON 预览，未上传或保存。刷新网页会退出预览。<button class="subtle small" data-action="refresh">退出预览</button></div>':state.static?'<div class="share-head">仓库数据看板 · 更新源表并提交到仓库，构建成功后刷新即可查看。</div>':state.share?'<div class="share-head">只读项目看板 · 数据由项目管理员从源表导入，点击刷新可查看最新已导入数据。</div>':''}<div class="content">${p?viewContent():empty('开通第一个项目工作台','填写项目名称和起始日期，上传已有问题表。团队仍在原来的表格里维护数据。','<button class="primary" data-action="new-project">＋ 创建项目</button>')}</div></main></div>`;
+  $('#app').innerHTML=`<div class="shell"><aside class="sidebar"><div class="brand"><span class="logo">◫</span>项目工作台</div><label for="project-select">当前项目 / PROJECT</label>${state.share||state.localReport?`<div class="project-name">${esc(p.name)}</div>`:`<select id="project-select" aria-label="切换项目"><option value="" ${p?'hidden':''}>选择项目</option>${state.projects.map(v=>`<option value="${v.id}" ${v.id===p?.id?'selected':''}>${esc(v.name)}</option>`).join('')}</select><button class="new-project" data-action="new-project">＋ ${state.static?'生成项目配置':'创建项目'}</button>`}<button class="new-project report-import-button" data-action="load-report">导入项目 JSON</button><input id="report-file" type="file" accept=".json" hidden><nav class="nav" aria-label="主导航">${available.map(([id,icon,name])=>`<button data-view="${id}" class="${state.view===id?'active':''}" ${p?'':'disabled'}><span class="nav-icon">${icon}</span>${name}</button>`).join('')}</nav><div class="sidebar-foot"><i class="dot"></i> ${readonly()?'项目只读视图':'表格维护 · 看板同步'}<p class="small">每一项进展，都有数据依据</p></div></aside><main class="main"><header class="topbar"><div class="crumb">工作空间 &nbsp;/&nbsp; <b>${esc(p?.name||'欢迎使用')}</b> &nbsp;/&nbsp; ${title}</div><div class="topbar-right"><span class="small muted">${readonly()?'只读看板':'项目管理员'}</span><span class="avatar">${readonly()?'阅':'管'}</span>${!readonly()?'<button class="subtle small" data-action="logout">退出</button>':''}</div></header>${state.localReport?'<div class="share-head">当前是本地 JSON 预览，未上传或保存。刷新网页会退出预览。<button class="subtle small" data-action="refresh">退出预览</button></div>':state.static?'<div class="share-head">仓库数据看板 · 更新源表并提交到仓库，构建成功后刷新即可查看。</div>':state.share?'<div class="share-head">只读项目看板 · 数据由项目管理员从源表导入，点击刷新可查看最新已导入数据。</div>':''}<div class="content">${p?viewContent():empty('开通第一个项目工作台','填写项目名称和起始日期，上传已有问题表。团队仍在原来的表格里维护数据。','<button class="primary" data-action="new-project">＋ 创建项目</button>')}</div></main></div>`;
 }
 function pageHead(title,desc,actions=''){return `<div class="page-head"><div><div class="eyebrow">PROJECT WORKBENCH</div><h1>${title}</h1><p>${desc}</p></div><div class="actions">${actions}</div></div>`;}
 function viewContent(){return ({report:reportView,overview:overview,issues:issuesView,timeline:timeline,weekly:weekly,imports:importsView,settings:settingsView,source:sourceView}[state.view]||overview)();}
@@ -70,11 +71,12 @@ function overview(){
 }
 function bar(label,value,total){return `<div class="bar-row"><span>${esc(label)}</span><progress value="${value}" max="${Math.max(1,total)}" aria-label="${esc(label)} ${value} 条"></progress><span>${value}</span></div>`;}
 function issueTable(items){return `<div class="table-wrap"><table><thead><tr><th>问题 / 编号</th><th>负责人</th><th>状态</th><th>优先级</th><th>版本</th><th>提出日期</th></tr></thead><tbody>${items.map(i=>`<tr><td><button class="link-btn" data-item="${esc(i.id)}">${esc(i.title)}</button><div class="id">${esc(i.id)} · ${esc(i.category)}</div><div class="tags">${tags(i)}</div></td><td class="nowrap">${esc(i.owner)}</td><td>${pill(i.status)}</td><td>${esc(i.priority)}</td><td>${esc(i.effectiveVersion)}</td><td class="nowrap muted small">${esc(i.date||'未标注')}</td></tr>`).join('')}</tbody></table></div>`;}
-function filtered(){const f=state.filters;return state.items.filter(i=>(!f.query||[i.id,i.title,i.owner,i.solution].some(v=>v.toLowerCase().includes(f.query.toLowerCase())))&&(!f.status||i.status===f.status)&&(!f.version||i.effectiveVersion===f.version)&&(!f.tag||i.tags.includes(f.tag)));}
+function filtered(){const f=state.filters;return state.items.filter(i=>(!f.ids||f.ids.includes(i.id))&&(!f.query||[i.id,i.title,i.owner,i.solution].some(v=>v.toLowerCase().includes(f.query.toLowerCase())))&&(!f.status||i.status===f.status)&&(!f.version||i.effectiveVersion===f.version)&&(!f.tag||i.tags.includes(f.tag)));}
 function filters(){return `<div class="filters"><input id="search" type="search" placeholder="搜索问题、编号、负责人或方案" aria-label="搜索问题" value="${esc(state.filters.query||'')}">${[['status','全部状态',['未解决','进行中','待验证','已解决','未标注']],['version','全部版本',[...new Set(state.items.map(i=>i.effectiveVersion))]],['tag','全部衡量标签',state.project.tags]].map(([key,label,values])=>`<select data-filter="${key}" aria-label="${label}"><option value="">${label}</option>${values.map(v=>`<option ${state.filters[key]===v?'selected':''}>${esc(v)}</option>`).join('')}</select>`).join('')}</div>`;}
 function issueResults(){const list=filtered(),pages=Math.max(1,Math.ceil(list.length/50));state.page=Math.min(state.page,pages);return `${list.length?issueTable(list.slice((state.page-1)*50,state.page*50)):empty('没有匹配的问题','试着调整筛选条件，或导入问题表。')}<div class="pagination"><span>共 ${list.length} 条 · 第 ${state.page} / ${pages} 页</span><div class="actions"><button data-action="prev" ${state.page===1?'disabled':''}>上一页</button><button data-action="next" ${state.page>=pages?'disabled':''}>下一页</button></div></div>`;}
-function issuesView(){return pageHead('问题明细','问题在源表中维护；这里查看当前状态与解决方案。')+`<section class="panel">${filters()}<div id="issue-results">${issueResults()}</div></section>`;}
+function issuesView(){return pageHead('问题明细','问题在源表中维护；这里查看当前状态与解决方案。')+relationBanner()+`<section class="panel">${filters()}<div id="issue-results">${issueResults()}</div></section>`;}
 function timeline(){
+  if(state.report)return projectTimeline();
   const groups={};for(const i of [...state.items].sort((a,b)=>b.date.localeCompare(a.date))) (groups[i.date||'未标注日期']??=[]).push(i);
   const entries=Object.entries(groups),pages=Math.max(1,Math.ceil(entries.length/20));state.page=Math.min(state.page,pages);
   return pageHead('问题时间轴','按提出日期回看问题，处理状态反映最新导入结果。')+`<section class="panel">${entries.length?entries.slice((state.page-1)*20,state.page*20).map(([day,items])=>`<div class="timeline-group"><h3>${esc(day)} <span class="muted small">${items.length} 条问题</span></h3>${items.map(i=>`<div class="timeline-item"><div><button class="link-btn" data-item="${esc(i.id)}">${esc(i.title)}</button><p>${esc(i.id)} · ${esc(i.owner)} · ${esc(i.effectiveVersion)}</p></div>${pill(i.status)}</div>`).join('')}</div>`).join(''):empty('时间轴尚无记录','导入带有提出日期的问题表后，将自动按日期排列。')}<div class="pagination"><span>第 ${state.page} / ${pages} 页</span><div class="actions"><button data-action="prev" ${state.page===1?'disabled':''}>上一页</button><button data-action="next" ${state.page>=pages?'disabled':''}>下一页</button></div></div></section>`;
@@ -124,7 +126,19 @@ document.addEventListener('click',async e=>{
   const target=e.target.closest('button');if(!target||target.disabled)return;if(state.busy){e.preventDefault();return;}
   if(target.hasAttribute('data-dimension')){state.reportDimension=state.reportDimension===target.dataset.dimension?'':target.dataset.dimension;render();return;}
   if(target.dataset.evidence){showEvidence(JSON.parse(target.dataset.evidence));return;}
-  if(target.dataset.view){state.view=target.dataset.view;state.page=1;render();return;}
+  if(target.dataset.case){const c=state.report.cases.find(c=>c.id===target.dataset.case);if(c)openDialog(caseCard(c));return;}
+  if(target.dataset.problem){showProblem(target.dataset.problem);return;}
+  if(target.dataset.insightProblems||target.dataset.insightIssues||target.dataset.insightCases){
+    const id=target.dataset.insightProblems||target.dataset.insightIssues||target.dataset.insightCases;
+    const i=state.report.insights.find(i=>i.id===id);if(!i)return;
+    if(target.dataset.insightCases){openDialog(`<h2>${esc(i.title)} · 研究案例</h2>${i.caseIds.map(id=>caseCard(state.report.cases.find(c=>c.id===id))).join('')||'<p class="muted">暂无关联研究案例</p>'}`);return;}
+    state.filters={};state.problemIds=null;state.relationTitle=i.title;state.page=1;
+    if(target.dataset.insightProblems){state.problemIds=i.projectProblemIds;state.view='timeline';}
+    else{state.filters.ids=i.issueIds;state.view='issues';}
+    render();return;
+  }
+  if(target.dataset.action==='clear-relation'){state.filters={};state.problemIds=null;state.relationTitle='';state.page=1;render();return;}
+  if(target.dataset.view){state.view=target.dataset.view;state.problemIds=null;state.relationTitle='';delete state.filters.ids;state.page=1;render();return;}
   if(target.dataset.item){detail(target.dataset.item);return;}
   if(target.dataset.week){const list=state.items.filter(i=>String(i.weekIndex)===target.dataset.week);openDialog(`<h2>${esc(list[0]?.week)}的问题</h2>${issueTable(list)}`);return;}
   if(target.dataset.action){state.busy=true;target.disabled=true;try{await act(target.dataset.action,target);}catch(err){notify(err.message,true);}finally{target.disabled=false;state.busy=false;}}

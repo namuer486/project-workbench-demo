@@ -452,8 +452,8 @@ def handler_for(app):
                 asset = "index.html" if path == "/" or parts[0] == "share" else parts[0]
                 mime = {"index.html": "text/html", "app.js": "text/javascript", "report.js": "text/javascript", "style.css": "text/css"}[asset]
                 return self.reply((ROOT / "static" / asset).read_bytes(), content_type=mime + "; charset=utf-8")
-            if method == "GET" and path == "/report.schema.json":
-                schema_path = ROOT.parent / "skills" / "ipd-report-json" / "references" / "report.schema.json"
+            if method == "GET" and path in ("/report.schema.json", "/project.schema.json"):
+                schema_path = ROOT.parent / "skills" / "ipd-report-json" / "references" / path.lstrip("/")
                 return self.reply(schema_path.read_bytes())
             if method == "GET" and len(parts) == 3 and parts[:2] == ["api", "share"]:
                 with app.store.connect() as db:

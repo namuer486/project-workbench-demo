@@ -34,7 +34,7 @@ class StaticBuildTests(unittest.TestCase):
         self.assertIn('src="./app.js"', html)
         self.assertIn('name="workbench-mode" content="static"', html)
         files = {p.name for p in self.output.rglob("*") if p.is_file()}
-        self.assertEqual(files, {"index.html", "app.js", "style.css", ".nojekyll", "manifest.json", "alpha.json", "report.js", "report.schema.json"})
+        self.assertEqual(files, {"index.html", "app.js", "style.css", ".nojekyll", "manifest.json", "alpha.json", "report.js", "report.schema.json", "project.schema.json"})
         data = json.loads((self.output / "data" / "alpha.json").read_text(encoding="utf-8"))
         self.assertEqual(data["items"][0]["id"], "001")
         self.assertNotIn("mapping", data["project"])

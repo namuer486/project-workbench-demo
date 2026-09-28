@@ -1,10 +1,10 @@
-# 数据合同 1.0
+# 项目拆解数据合同 2.0
 
-一个 `report.json` 表达一个项目的一次研究报告及对应开发问题快照。后续研究波次生成新的文件或在明确更新任务中替换，不把不同时间、不同样本的分数混为一次测量。
+一个 `report.json` 表达一个项目的拆解快照；IPD 研究报告和开发问题都是输入资料。后续研究波次生成新的文件或在明确更新任务中替换，不把不同时间、不同样本的分数混为一次测量。
 
 | 字段 | 内容 |
 |---|---|
-| schemaVersion | 固定 `1.0`，平台拒绝未知版本 |
+| schemaVersion | 新生成固定 `2.0`，平台拒绝未知版本 |
 | reviewStatus | `draft` 或 `reviewed`；AI 初次生成用 draft |
 | isDemo | 是否合成演示数据，真实材料为 false |
 | project | id、name、startDate、stage；未知日期和阶段为 null |
@@ -14,6 +14,9 @@
 | dimensions | 六个固定 ID 对应的维度对象 |
 | cases | 亮点、问题或观察案例，以及原文/AI 分析与建议 |
 | issues | 实际开发问题，保留源问题编号 |
+| ipd | 阶段链、当前重点、下一轮验证输入 |
+| projectProblems | 项目级问题：目标、KSF、方案、复盘，以及来源关联 |
+| insights | 通用性提炼：共性结论、关键要点与三层关联 |
 | openQuestions | 缺失、歧义、冲突、待确认关系 |
 
 维度 ID：`novelty` 新鲜感、`goals` 目标感、`growth` 成长感、`fun` 乐趣性、`social` 社交感、`time_cost` 时间成本。字段顺序无关，但六个维度不能缺失或重复。未知维度数据用 `summary: null, metrics: []`，不填 0。
@@ -59,3 +62,23 @@
 JSON Schema 描述字段类型和结构。`scripts/validate.py` 使用标准库执行本合同所用的 Schema 关键字，并额外校验 ID 唯一、引用有效、固定维度、范围和日期关系；不是任意 JSON Schema 的通用引擎。
 
 静态工作台支持 `projects/<项目id>/report.json`，文件夹名与 `project.id` 一致。同目录不要同时维护 report.json 和旧的 project.json，以免出现两份数据来源。所有开发问题放进 report.json 的 issues。浏览器可先加载 JSON 本地预览，保存到仓库后才成为团队共享版本。
+
+## 项目拆解的三层关系
+
+正式结构见 [project.schema.json](project.schema.json)，完整例子见 [example-project.json](example-project.json)。旧 `report.schema.json` 和 `example-report.json` 保留作 v1 兼容；旧数据不会自动生成共性结论。
+
+- **输入层**：`cases` 是研究发现（包含亮点）；`issues` 是实际开发台账。两者不能互相伪造。一份报告不必创建开发任务，也可以形成只引用案例的项目问题。
+- **项目问题层**：`projectProblems` 每条包含 `id/title/dimensionIds/date/status/owner/version/goal/ksf/solution/review/issueIds/caseIds/evidenceRefs`。至少关联一个案例或开发明细。项目级状态单独取自资料，不从任意一条明细外推；日期未知用 null，页面在“日期待补充”中展示。
+- **提炼层**：`insights` 每条包含 `id/title/theme/dimensionIds/summary/keyPoints/issueIds/caseIds/projectProblemIds`。至少关联一个案例或明细；项目问题引用可为空。提炼描述共性机制、适用情境或待验证假设，不重复粘贴原问题。多个来源讲同一现象不等于多个独立案例。
+
+`goal/solution/review` 可为 null；`ksf/keyPoints/focus/nextInputs` 为内容对象数组；`summary` 为必填内容对象。内容对象统一为：
+
+```json
+{"text":"基于资料提出的待验证建议","origin":"ai","evidenceRefs":["ev-case-goals"]}
+```
+
+这些新字段无论 source 还是 ai 都必须有非空、有效依据；source 指原文明确记录，ai 指从依据归纳或建议，不能表示已执行或已验证。KSF 原文没给验收阈值时，允许提出验证方向并标明 AI，不能编造通过率。
+
+`ipd.stages` 是 `{id,name,state,evidenceRefs}` 数组；state 取 completed/current/upcoming/unknown。没有阶段资料就 `[]`；仅提供当前阶段就只写当前阶段。`focus` 和 `nextInputs` 是上述内容对象数组。
+
+关联 ID 必须存在且不重复。提炼的 `issueIds/caseIds` 只挂载实际支持该结论的输入，不隐含继承项目问题的全部输入。平台据这些显式关联计算条数和未闭环数（包含未标注状态）；项目问题数量与开发明细数量分开计算。所有引用原文保留可核对定位。

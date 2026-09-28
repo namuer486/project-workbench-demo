@@ -73,7 +73,8 @@ def build(source, output, repository="", ref="main"):
     (output / "data").mkdir(exist_ok=True)
     for asset in ("app.js", "style.css", "report.js"):
         shutil.copyfile(ROOT / "static" / asset, output / asset)
-    shutil.copyfile(SKILL / "references" / "report.schema.json", output / "report.schema.json")
+    for schema_name in ("report.schema.json", "project.schema.json"):
+        shutil.copyfile(SKILL / "references" / schema_name, output / schema_name)
     html = (ROOT / "static" / "index.html").read_text(encoding="utf-8")
     html = html.replace('<meta charset="utf-8">', '<meta charset="utf-8">\n  <meta name="workbench-mode" content="static">\n  <meta name="referrer" content="no-referrer">')
     html = html.replace('href="/style.css"', 'href="./style.css"').replace('src="/app.js"', 'src="./app.js"').replace('src="/report.js"', 'src="./report.js"')

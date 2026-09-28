@@ -95,5 +95,56 @@ class ReportContractTests(unittest.TestCase):
                 build(root / "projects", root / "site2")
 
 
+class ProjectDecompositionTests(unittest.TestCase):
+    def setUp(self):
+        self.data = contract.load_json(SKILL / "references" / "example-project.json")
+
+    def test_project_relations_survive_build(self):
+        self.assertEqual(contract.validate(self.data), [])
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source = root / "projects" / "ipd-demo"
+            source.mkdir(parents=True)
+            (source / "report.json").write_text(json.dumps(self.data), encoding="utf-8")
+            build(root / "projects", root / "site")
+            snapshot = json.loads((root / "site/data/ipd-demo.json").read_text(encoding="utf-8"))
+            self.assertEqual(snapshot["report"]["insights"], self.data["insights"])
+            self.assertEqual(snapshot["report"]["projectProblems"][0]["date"], None)
+            self.assertEqual(snapshot["items"][0]["date"], "2026-09-15")
+            self.assertTrue((root / "site/project.schema.json").is_file())
+
+    def test_rejects_dangling_relations_and_unsupported_conclusions(self):
+        mutations = [
+            lambda d: d["insights"][0].update(projectProblemIds=["missing"]),
+            lambda d: d["insights"][0].update(caseIds=["missing"]),
+            lambda d: d["projectProblems"][0].update(issueIds=["missing"]),
+            lambda d: d["insights"][0].update(caseIds=[], issueIds=[]),
+            lambda d: d["projectProblems"][0].update(caseIds=[], issueIds=[]),
+            lambda d: d["insights"][0]["summary"].update(evidenceRefs=[]),
+            lambda d: d["projectProblems"][0]["goal"].update(evidenceRefs=["missing"]),
+            lambda d: d["ipd"]["stages"].append({**d["ipd"]["stages"][0], "id":"second"}),
+            lambda d: d["projectProblems"].append(copy.deepcopy(d["projectProblems"][0])),
+            lambda d: d.pop("insights"),
+        ]
+        for mutation in mutations:
+            with self.subTest(mutation=mutation):
+                data = copy.deepcopy(self.data)
+                mutation(data)
+                self.assertTrue(contract.validate(data))
+
+    def test_report_only_can_support_problem_without_inventing_task(self):
+        self.data["issues"] = []
+        for item in self.data["cases"] + self.data["projectProblems"] + self.data["insights"]:
+            item["issueIds"] = []
+        self.assertEqual(contract.validate(self.data), [])
+        self.assertEqual(report_snapshot(self.data, "2026-09-28")["items"], [])
+
+    def test_empty_decomposition_is_valid_and_legacy_does_not_get_fake_insights(self):
+        self.data.update(projectProblems=[], insights=[], ipd={"stages":[],"focus":[],"nextInputs":[]})
+        self.assertEqual(contract.validate(self.data), [])
+        legacy = contract.load_json(SKILL / "references/example-report.json")
+        self.assertNotIn("insights", report_snapshot(legacy, "2026-09-28")["report"])
+
+
 if __name__ == "__main__":
     unittest.main()

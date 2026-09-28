@@ -1,8 +1,8 @@
 # 项目工作台平台版
 
-当前开发方向：**IPD 研究报告 + 开发问题 → GPT 使用 Skill 生成 report.json → 平台校验与可视化 → 公司内部静态部署。**
+当前开发方向：**IPD 研究报告 + 开发问题 → GPT 使用 Skill 生成 report.json → 项目级问题与通用性提炼 → 公司内部静态部署。**
 
-- [IPD 报告 JSON 工作流](docs/IPD报告JSON工作流.md)：标准结构、GPT 调用示例、依据追溯与导入。
+- [项目拆解 JSON 工作流](docs/IPD报告JSON工作流.md)：v2 三层结构、GPT 调用示例、依据追溯与导入；兼容旧版 JSON。
 - [ipd-report-json Skill](skills/ipd-report-json/SKILL.md)：可复制给其他成员使用；纯 Python 校验器无需额外依赖。
 - Windows 本地查看：双击 `预览静态工作台.cmd`（需要 Python 3.11+；首次安装依赖需要网络）。
 - [静态工作台部署与更新说明](docs/静态工作台部署.md)：推荐路径，GitHub Actions 自动校验 Excel/CSV 并生成静态网站。
