@@ -98,7 +98,9 @@ async function main(){
   await page.locator('#report-file').setInputFiles({name:'report.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(serverReport))});
   await page.getByRole('button',{name:'保存并生成项目',exact:true}).click();
   await page.waitForFunction(()=>state.project?.id==='ipd-demo'&&!state.localReport&&!state.busy);
-  await page.reload();await visible(page,'.dimension-grid');
+  await page.reload();await visible(page,'#project-select');
+  await page.locator('#project-select').selectOption('ipd-demo');
+  await visible(page,'.dimension-grid');
   await goView(page,'imports');
   assert.ok((await page.locator('.content').innerText()).includes('版本 1'));
   serverReport.project.name='已保存的 JSON 项目';
@@ -115,6 +117,29 @@ async function main(){
   await visible(jsonShared,'.insight-card');
   assert.equal(await jsonShared.locator('[data-action="save-report"]').count(),0);
   assert.equal(await jsonShared.locator('[data-view="imports"]').count(),0);
+  assert.equal(await jsonShared.locator('[data-action="delete-project"]').count(),0);
+  // Cancel preserves data; confirmation deletes only the selected project and revokes sharing.
+  await page.locator('[data-action="delete-project"]').click();
+  await visible(page,'dialog[open]');
+  assert.ok((await page.locator('dialog').innerText()).includes('已保存的 JSON 项目'));
+  await page.getByRole('button',{name:'取消',exact:true}).click();
+  assert.equal((await page.request.get(`http://127.0.0.1:${backendPort}/api/projects/ipd-demo`)).status(),200);
+  await page.locator('[data-action="delete-project"]').click();
+  await page.screenshot({path:path.join(output,'delete-project-confirmation.png'),fullPage:true});
+  await page.locator('[data-action="confirm-delete-project"]').click();
+  await page.waitForFunction(()=>state.project?.id!=='ipd-demo'&&!state.busy);
+  assert.equal((await page.request.get(`http://127.0.0.1:${backendPort}/api/projects/ipd-demo`)).status(),404);
+  assert.equal(await page.locator('#project-select option[value="ipd-demo"]').count(),0);
+  await jsonShared.reload();await jsonShared.getByRole('heading',{name:'无法打开工作台'}).waitFor();
+  // The last deletion must produce a usable empty workspace with no stale report state.
+  while(await page.evaluate(()=>!!state.project)){
+    await goView(page,'settings');
+    await page.locator('[data-action="delete-project"]').click();
+    await page.locator('[data-action="confirm-delete-project"]').click();
+    await page.waitForFunction(()=>!state.busy);
+  }
+  await page.getByRole('heading',{name:'开通第一个项目工作台'}).waitFor();
+  await page.reload();await page.getByRole('heading',{name:'开通第一个项目工作台'}).waitFor();
   await jsonReader.close();
   // Static build under a project subpath, without any backend API.
   const staticPage=await context.newPage();

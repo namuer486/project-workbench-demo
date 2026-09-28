@@ -294,6 +294,19 @@ class Store:
             db.execute("UPDATE projects SET config=?,revision=revision+1,updated=? WHERE id=?", (dumps(config), now(), project_id))
         return self.project(project_id)
 
+    def delete(self, project_id, payload):
+        if payload.get("confirmed") is not True:
+            raise Error("请先确认删除项目")
+        with self.connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            project = self.project(project_id, db)
+            if payload.get("revision") != project["revision"]:
+                raise Error("项目已被更新，请刷新后重新确认删除", 409)
+            for table in ("imports", "items", "report_versions", "reports"):
+                db.execute(f"DELETE FROM {table} WHERE project_id=?", (project_id,))
+            db.execute("DELETE FROM projects WHERE id=?", (project_id,))
+        return {"ok": True, "projectId": project_id}
+
     def preview_report(self, report):
         errors = contract.validate(report)
         if errors:
@@ -591,6 +604,14 @@ def handler_for(app):
             project_id = parts[2]
             project = app.store.project(project_id)
             action = parts[3] if len(parts) == 4 else ""
+            if method == "POST" and action == "delete":
+                result = app.store.delete(project_id, body)
+                with app.lock:
+                    for collection in (app.uploads, app.previews):
+                        for token, (_, value) in list(collection.items()):
+                            if value.get("projectId") == project_id:
+                                collection.pop(token, None)
+                return self.reply(result)
             if not action and len(parts) == 3:
                 return self.reply(app.store.snapshot(project_id) if method == "GET" else app.store.update(project_id, body))
             if method == "GET" and action == "report":

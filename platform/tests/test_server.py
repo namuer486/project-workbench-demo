@@ -89,6 +89,25 @@ class StoreTests(unittest.TestCase):
         self.assertEqual(json.loads(row[0]), [])
         self.assertEqual(json.loads(row[1])[0]["title"], "首次")
 
+    def test_delete_is_scoped_and_rejects_stale_confirmation(self):
+        preview = self.preview(records(("A", "问题", "未解决", "2026-01-01", "")))
+        self.store.commit(preview)
+        other = self.store.create(CONFIG | {"name": "保留项目"})
+        pid = self.project["id"]
+        with self.assertRaises(Error):
+            self.store.delete(pid, {"revision": 1})
+        with self.assertRaises(Error) as context:
+            self.store.delete(pid, {"confirmed": True, "revision": 0})
+        self.assertEqual(context.exception.status, 409)
+        self.assertEqual(len(self.store.snapshot(pid)["items"]), 1)
+        self.store.delete(pid, {"confirmed": True, "revision": 1})
+        with self.store.connect() as db:
+            for table in ("imports", "items", "reports", "report_versions"):
+                self.assertEqual(db.execute(f"SELECT COUNT(*) FROM {table} WHERE project_id=?", (pid,)).fetchone()[0], 0)
+        self.assertEqual(self.store.project(other["id"])["name"], "保留项目")
+        with self.assertRaises(Error):
+            self.store.commit(preview)
+
     def test_week_and_version_boundaries(self):
         self.store.commit(self.preview(records(("A", "前一天", "未解决", "2025-12-31", ""), ("B", "新版本", "未解决", "2026-09-01", ""), ("C", "无日期", "未解决", "", ""))))
         items = self.store.snapshot(self.project["id"])["items"]
@@ -234,6 +253,26 @@ class HttpTests(unittest.TestCase):
         self.assertEqual(self.request(path + "/upload", {})[0], 400)
         self.request(path + "/share", {"enabled":False})
         self.assertEqual(self.request(share["feed"], authenticated=False)[0], 404)
+
+    def test_delete_report_revokes_share_and_cached_previews(self):
+        self.login()
+        report = self.report()
+        _, preview = self.request("/api/reports/preview", {"report": report})
+        _, saved = self.request("/api/reports/commit", {"token": preview["token"]})
+        path = '/api/projects/' + saved["projectId"]
+        _, preview = self.request("/api/reports/preview", {"report": report})
+        _, share = self.request(path + "/share", {"enabled": True})
+        payload = {"confirmed": True, "revision": saved["revision"]}
+        self.assertEqual(self.request(path + "/delete", payload, authenticated=False)[0], 401)
+        self.assertEqual(self.request(path + "/delete", payload, origin="https://unrelated.example")[0], 403)
+        self.assertEqual(self.request(path + "/delete", payload)[0], 200)
+        self.assertEqual(self.request(path)[0], 404)
+        self.assertEqual(self.request(share["feed"], authenticated=False)[0], 404)
+        self.assertEqual(self.request("/api/reports/commit", {"token": preview["token"]})[0], 410)
+        self.assertEqual(self.request("/api/projects")[1], [])
+        with self.app.store.connect() as db:
+            for table in ("projects", "reports", "report_versions", "items", "imports"):
+                self.assertEqual(db.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0], 0)
 
     def test_json_update_conflicts_are_atomic_and_keep_versions(self):
         self.login()
