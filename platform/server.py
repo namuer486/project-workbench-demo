@@ -349,6 +349,103 @@ class Store:
             db.executemany("INSERT INTO items VALUES(?,?,?)", [(project_id, i["id"], dumps(i)) for i in snapshot["items"]])
         return {"projectId": project_id, "revision": revision}
 
+    def edit_problem(self, project_id, payload):
+        """Edit the stored document, preserving source evidence and optimistic locking."""
+        snapshot = self.snapshot(project_id)
+        report = snapshot.get("report")
+        if not report or report["schemaVersion"] != "2.0":
+            raise Error("请在已保存的新版项目拆解中维护项目问题")
+        revision = snapshot["project"]["revision"]
+        if payload.get("revision") != revision:
+            raise Error("项目已被其他人更新。请保留当前填写内容，刷新后重新编辑。", 409)
+        operation = payload.get("operation")
+        if operation not in ("create", "update", "delete"):
+            raise Error("不支持的问题操作")
+        pid = payload.get("id")
+        old = next((p for p in report["projectProblems"] if p["id"] == pid), None)
+        if operation != "create" and old is None:
+            raise Error("项目问题不存在", 404)
+        if operation == "delete":
+            if payload.get("confirmed") is not True:
+                raise Error("请先确认删除问题")
+            report["projectProblems"] = [p for p in report["projectProblems"] if p["id"] != pid]
+            for insight in report["insights"]:
+                insight["projectProblemIds"] = [i for i in insight["projectProblemIds"] if i != pid]
+        else:
+            fields = payload.get("fields")
+            limits = {"title": 200, "owner": 120, "version": 80, "category": 100,
+                      "severity": 50, "source": 200, "date": 10, "status": 10,
+                      "goal": 4000, "solution": 4000, "review": 4000, "ksf": 40000}
+            if not isinstance(fields, dict) or set(fields) != set(limits) | {"dimensionIds", "caseIds", "issueIds"}:
+                raise Error("问题表单字段不完整，请刷新页面后重试")
+            for key, limit in limits.items():
+                if not isinstance(fields[key], str) or len(fields[key]) > limit:
+                    raise Error("字段格式不正确或文字过长：" + key)
+                fields[key] = fields[key].strip()
+            for key in ("dimensionIds", "caseIds", "issueIds"):
+                if not isinstance(fields[key], list) or any(not isinstance(v, str) for v in fields[key]):
+                    raise Error("关联字段格式不正确")
+            if not fields["title"]:
+                raise Error("请填写事项标题")
+            if operation == "create" and not fields["goal"]:
+                raise Error("请填写目标成果")
+            if fields["status"] == "已解决" and not fields["solution"]:
+                raise Error("已解决问题请填写解决方案")
+            pid = old["id"] if old else "manual-" + secrets.token_hex(8)
+
+        stamp = now()
+        # The author is not inferred: the local deployment has no individual accounts.
+        source = next((s for s in report["sources"] if s["title"] == "工作台在线维护记录" and s["type"] == "other"), None)
+        if source is None:
+            source = {"id": "online-" + secrets.token_hex(8), "title": "工作台在线维护记录", "type": "other"}
+            report["sources"].append(source)
+        def evidence(label, text):
+            ids = []
+            for n in range(0, len(text), 550):
+                part = text[n:n + 550]
+                if not part.strip():
+                    continue
+                eid = "online-" + secrets.token_hex(12)
+                report["evidence"].append({"id": eid, "sourceId": source["id"],
+                    "location": f"{stamp} / {pid} / {label} / 第{n // 550 + 1}段", "excerpt": part})
+                ids.append(eid)
+            return ids
+        audit = evidence("操作记录", {"create": "人工新增", "update": "人工编辑", "delete": "人工删除"}[operation] + "项目问题：" + (old["title"] if operation == "delete" else fields["title"]))
+        if operation != "delete":
+            item = dict(old) if old else {"id": pid, "evidenceRefs": []}
+            item["origin"] = "manual"
+            for key in ("title", "date", "status", "owner", "version", "category", "severity", "source"):
+                item[key] = fields[key] or None
+            for key in ("dimensionIds", "caseIds", "issueIds"):
+                item[key] = fields[key]
+            def manual_content(txt, label):
+                ev = evidence(label, txt)
+                audit.extend(ev)
+                return {"text": txt, "origin": "manual", "evidenceRefs": ev}
+            for key in ("goal", "solution", "review"):
+                existing = old.get(key) if old else None
+                txt = fields[key]
+                item[key] = existing if existing and existing["text"] == txt else manual_content(txt, key) if txt else None
+            existing_ksf = old["ksf"] if old else []
+            if fields["ksf"] == "\n".join(v["text"] for v in existing_ksf):
+                item["ksf"] = existing_ksf
+            else:
+                item["ksf"] = [manual_content(line.strip(), "KSF") for line in fields["ksf"].splitlines() if line.strip()]
+            audit.extend(evidence("基本信息与关联", dumps({k: item[k] for k in ("title", "date", "status", "owner", "version", "category", "severity", "source", "dimensionIds", "caseIds", "issueIds")})))
+            item["evidenceRefs"] = list(dict.fromkeys(item["evidenceRefs"] + audit))
+            if old:
+                report["projectProblems"] = [item if p["id"] == pid else p for p in report["projectProblems"]]
+            else:
+                report["projectProblems"].append(item)
+        report["reviewStatus"] = "draft"
+        errors = contract.validate(report)
+        if errors:
+            raise Error("问题未保存：" + "；".join(errors[:10]))
+        if len(dumps(report).encode("utf-8")) > MAX_FILE:
+            raise Error("项目数据不能超过 10 MB", 413)
+        result = self.save_report({"report": report, "projectId": project_id, "revision": revision})
+        return {**result, "problemId": pid}
+
     def snapshot(self, project_id):
         with self.connect() as db:
             db.execute("BEGIN")
@@ -604,6 +701,8 @@ def handler_for(app):
             project_id = parts[2]
             project = app.store.project(project_id)
             action = parts[3] if len(parts) == 4 else ""
+            if method == "POST" and action == "problems":
+                return self.reply(app.store.edit_problem(project_id, body))
             if method == "POST" and action == "delete":
                 result = app.store.delete(project_id, body)
                 with app.lock:

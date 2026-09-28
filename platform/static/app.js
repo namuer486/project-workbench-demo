@@ -58,12 +58,13 @@ async function loadProject(id){
 }
 function render(){
   const p=state.project, available=(state.report?[['report','◈','项目提炼']]:[]).concat(nav.filter(n=>!readonly()||!['imports','settings'].includes(n[0])).concat(state.static?[['source','⇧','仓库数据']]:[]));
+  if(canEditProblems())available.splice(1,0,['submit','✎','项目问题提交']);
   if(state.report){const timelineNav=available.find(n=>n[0]==='timeline');if(timelineNav)available[available.indexOf(timelineNav)]=['timeline','◷','项目问题时间轴'];}
   const title=available.find(n=>n[0]===state.view)?.[2]||'项目概览';
   $('#app').innerHTML=`<div class="shell"><aside class="sidebar"><div class="brand"><span class="logo">◫</span>项目工作台</div><label for="project-select">当前项目 / PROJECT</label>${state.share||state.localReport?`<div class="project-name">${esc(p.name)}</div>`:`<select id="project-select" aria-label="切换项目"><option value="" ${p?'hidden':''}>选择项目</option>${state.projects.map(v=>`<option value="${v.id}" ${v.id===p?.id?'selected':''}>${esc(v.name)}</option>`).join('')}</select><button class="new-project" data-action="new-project">＋ ${state.static?'生成项目配置':'创建项目'}</button>`}<button class="new-project report-import-button" data-action="load-report">导入项目 JSON</button><input id="report-file" type="file" accept=".json" hidden><nav class="nav" aria-label="主导航">${available.map(([id,icon,name])=>`<button data-view="${id}" class="${state.view===id?'active':''}" ${p?'':'disabled'}><span class="nav-icon">${icon}</span>${name}</button>`).join('')}</nav><div class="sidebar-foot"><i class="dot"></i> ${readonly()?'项目只读视图':'表格维护 · 看板同步'}<p class="small">每一项进展，都有数据依据</p></div></aside><main class="main"><header class="topbar"><div class="crumb">工作空间 &nbsp;/&nbsp; <b>${esc(p?.name||'欢迎使用')}</b> &nbsp;/&nbsp; ${title}</div><div class="topbar-right"><span class="small muted">${readonly()?'只读看板':'项目管理员'}</span><span class="avatar">${readonly()?'阅':'管'}</span>${!readonly()&&state.requireLogin!==false?'<button class="subtle small" data-action="logout">退出</button>':''}</div></header>${state.localReport?reportSaveBanner():state.static?'<div class="share-head">仓库数据看板 · 更新源表并提交到仓库，构建成功后刷新即可查看。</div>':state.share?'<div class="share-head">只读项目看板 · 数据由项目管理员从源表导入，点击刷新可查看最新已导入数据。</div>':''}<div class="content">${p?viewContent():empty('开通第一个项目工作台','导入 GPT 生成的项目 JSON，或创建表格项目后上传问题清单。','<button class="primary" data-action="load-report">导入 JSON 生成项目</button> <button data-action="new-project">创建表格项目</button>')}</div></main></div>`;
 }
 function pageHead(title,desc,actions=''){return `<div class="page-head"><div><div class="eyebrow">PROJECT WORKBENCH</div><h1>${title}</h1><p>${desc}</p></div><div class="actions">${actions}</div></div>`;}
-function viewContent(){return ({report:reportView,overview:overview,issues:issuesView,timeline:timeline,weekly:weekly,imports:importsView,settings:settingsView,source:sourceView}[state.view]||overview)();}
+function viewContent(){return ({report:reportView,submit:problemSubmitView,overview:overview,issues:issuesView,timeline:timeline,weekly:weekly,imports:importsView,settings:settingsView,source:sourceView}[state.view]||overview)();}
 function sourceBanner(){if(state.report)return `<div class="source-banner"><div><strong>项目 JSON · 版本 ${state.project.revision}</strong><p>最近保存 ${esc(dateLabel(state.project.updated))}</p></div></div>`;const latest=state.history[0];return `<div class="source-banner"><div class="source-text"><span class="source-icon">▤</span><div><strong>${state.static?esc(state.project.sourceFile):latest?esc(latest.filename):state.items.length?'数据已同步至工作台':'等待首次导入问题表'}</strong><p>${state.localReport?'本地加载 '+dateLabel(state.project.updated):state.static?'最近构建 '+dateLabel(state.project.updated):latest?'最近导入 '+dateLabel(latest.created):state.items.length?'项目更新于 '+dateLabel(state.project.updated):'支持 Excel / CSV · 自动记住字段映射 · 相同编号更新已有问题'}</p></div></div><span class="pill ${state.items.length?'green':'gray'}"><i class="dot"></i>${state.items.length?'源表维护中':'尚无数据'}</span></div>`;}
 function overview(){
   const total=state.items.length, solved=state.items.filter(i=>i.status==='已解决').length, pending=state.items.filter(i=>i.status==='待验证').length, rate=total?Math.round(solved/total*100):0;
@@ -96,7 +97,7 @@ function previewView(){const p=state.preview;return `<div class="panel-head"><h3
 function configFields(p){return `<div class="form-grid"><div class="field"><label for="name">项目名称 *</label><input id="name" name="name" required maxlength="80" value="${esc(p.name||'')}" placeholder="例如：星港计划"></div><div class="field"><label for="startDate">项目起始日期 *</label><input id="startDate" name="startDate" type="date" required value="${esc(p.startDate||new Date().toLocaleDateString('en-CA'))}"><small>作为第 1 周起点，每 7 天自动划分周次</small></div><div class="field wide"><label for="stage">当前阶段</label><input id="stage" name="stage" maxlength="60" value="${esc(p.stage||'')}" placeholder="例如：核心玩法验证"></div><div class="field wide"><label for="tags">衡量标签</label><input id="tags" name="tags" required value="${esc((p.tags||state.defaultTags).join('，'))}"><small>用逗号分隔，所有页面共享同一份标签定义</small></div><div class="field wide"><label for="versions">版本与起始日期</label><textarea id="versions" name="versions" placeholder="v1.0,2026-09-01&#10;v2.0,2026-10-01">${esc((p.versions||[]).map(v=>v.name+','+v.startDate).join('\n'))}</textarea><small>每行填写「版本名称,YYYY-MM-DD」。源表没有填写版本时按日期归属，日期早于所有版本时显示未划分。</small></div></div>`;}
 function settingsView(){if(readonly())return empty('只读项目','当前视图不支持修改或删除项目。');return pageHead('项目设置','统一维护标签与版本规则，看板随配置自动更新。')+`${state.report?'<section class="panel"><h3>项目拆解数据</h3><p>通过完整 JSON 更新项目名称、阶段、问题与提炼关系。</p><button data-view="imports">管理项目数据</button></section>':`<section class="panel"><form id="settings-form">${configFields(state.project)}<div class="form-actions"><button class="primary">保存设置</button></div></form></section>`}<section class="panel"><div class="panel-head"><div><h3>项目只读分享</h3><p>持有链接的人可以查看该项目全部问题和解决方案，不能修改或导入。</p></div><span class="pill ${state.project.sharing?'green':'gray'}">${state.project.sharing?'已开启':'未开启'}</span></div><div class="actions"><button data-action="share">${state.project.sharing?'重新生成链接（旧链接失效）':'生成只读链接'}</button>${state.project.sharing?'<button class="danger" data-action="revoke-share">撤销分享</button>':''}</div><div id="share-result"></div></section><section class="panel"><h3>公司 AI 知识库接入</h3><p class="muted">已提供项目只读 JSON 数据接口，可在生成分享链接后获取。后续可按公司知识库的实际接口对接；当前尚未连接公司系统。</p><p class="footnote">${state.requireLogin===false?'当前为本机免登录模式。':'当前管理端使用统一管理口令。'}每个项目的分享凭证独立；企业账号登录和细粒度成员权限留待接入公司系统时实现。</p></section><section class="panel"><h3>删除项目</h3><p class="muted">删除后，项目数据、导入记录和历史版本将被永久移除，只读分享链接也将失效。此操作无法撤销。</p><button class="danger" data-action="delete-project">删除项目</button></section>`;}
 function formConfig(form){const f=new FormData(form);return {name:f.get('name'),startDate:f.get('startDate'),stage:f.get('stage'),tags:f.get('tags').split(/[,，]/).map(t=>t.trim()).filter(Boolean),versions:f.get('versions').split('\n').map(l=>l.trim()).filter(Boolean).map(line=>{const parts=line.split(/[,，]/);if(parts.length!==2)throw new Error('版本请按「名称,YYYY-MM-DD」每行一项填写');return {name:parts[0].trim(),startDate:parts[1].trim()};})};}
-function openDialog(html){const d=$('#dialog');d.innerHTML=`<button class="subtle close" data-action="close-dialog" aria-label="关闭">×</button>${html}`;if(!d.open)d.showModal();}
+function openDialog(html){const d=$('#dialog');d.classList.remove('problem-editor');d.innerHTML=`<button class="subtle close" data-action="close-dialog" aria-label="关闭">×</button>${html}`;if(!d.open)d.showModal();}
 function detail(id){const i=state.items.find(v=>v.id===id);if(!i)return;openDialog(`<span class="id">${esc(i.id)}</span><div class="detail-title">${esc(i.title)}</div>${pill(i.status)}<dl class="detail-grid">${[['负责人',i.owner],['优先级',i.priority],['版本',i.effectiveVersion],['功能分类',i.category],['提出日期',i.date||'未标注'],['解决日期',i.resolvedAt||'未标注'],['衡量标签',i.tags.join('、')||'未标注'],['解决方案',i.solution||'源表尚未提供']].map(([k,v])=>`<div class="${k==='解决方案'?'wide':''}"><dt>${k}</dt><dd>${esc(v)}</dd></div>`).join('')}</dl>${state.report?evidenceButton(i.evidenceRefs||[]):''}<div class="notice">${state.report?'问题来自报告 JSON；修改资料后重新生成 JSON 更新。':'请在源表中维护问题，再导入新版更新工作台。'}</div>`);}
 async function uploadFile(file,sheet){
   if(!file)return;if(file.size>10*1024*1024)throw new Error('文件不能超过 10 MB');
@@ -104,6 +105,15 @@ async function uploadFile(file,sheet){
   state.upload=await api(endpoint('upload'),{filename:file.name,content:btoa(binary),sheet});state.file=file;state.preview=null;render();
 }
 async function act(action,button){
+  if(['new-project','load-report','refresh','logout'].includes(action)&&!discardProblemDraft())return;
+  if(action==='reset-problem'){if(discardProblemDraft())render();return;}
+  if(action==='confirm-delete-problem'){
+    if(!canEditProblems()||button.dataset.projectId!==state.project.id)throw new Error('当前项目已变化');
+    const view=state.view;
+    await api(endpoint('problems'),{operation:'delete',id:button.dataset.problemId,confirmed:true,revision:Number(button.dataset.revision)});
+    $('#dialog').close();await refreshProblems(view);notify('项目问题已删除');return;
+  }
+
   if(action==='delete-project'){
     if(readonly()||!state.project)return;
     const p=state.project;
@@ -128,7 +138,7 @@ async function act(action,button){
   if(action==='load-report'){$('#report-file').click();return;}
   if(action==='new-project'&&state.static)return openDialog(`<h2>生成项目配置</h2><p class="notice">填写后下载配置文件，与问题表一起放到仓库的 projects/项目代号/ 目录，提交后自动构建。</p><form id="static-create-form">${configFields({})}<div class="field"><label for="source-file">问题表文件名</label><input id="source-file" name="sourceFile" value="issues.csv" required placeholder="例如 issues.xlsx"></div><div class="form-actions"><button class="primary">下载 project.json</button></div></form>`);
   if(action==='new-project')return openDialog(`<h2>创建项目工作台</h2><p class="notice">创建后即可导入现有问题表，无需为新项目重新部署。</p><form id="create-form">${configFields({})}<div class="form-actions"><button type="button" data-action="close-dialog">取消</button><button class="primary">创建工作台</button></div></form>`);
-  if(action==='close-dialog')return $('#dialog').close();
+  if(action==='close-dialog'){if(discardProblemDraft())$('#dialog').close();return;}
   if(action==='logout'){await api('/api/logout',{});location.assign('/');return;}
   if(action==='refresh'){if(state.localReport&&!state.static){state.project=null;state.localReport=false;state.report=null;state.pendingReport=null;state.view='overview';}if(state.static){await boot();}else if(state.share){Object.assign(state,await api('/api/share/'+state.share));render();}else await loadProjects();notify('已刷新最新导入数据');return;}
   if(action==='reset-import'){state.upload=null;state.preview=null;state.file=null;render();return;}
@@ -161,7 +171,10 @@ document.addEventListener('click',async e=>{
     render();return;
   }
   if(target.dataset.action==='clear-relation'){state.filters={};state.problemIds=null;state.relationTitle='';state.page=1;render();return;}
-  if(target.dataset.view){state.view=target.dataset.view;state.problemIds=null;state.relationTitle='';delete state.filters.ids;state.page=1;render();return;}
+  if(target.dataset.editProblem){openProblemEditor(target.dataset.editProblem);return;}
+  if(target.dataset.supplementProblem){openProblemEditor(target.dataset.supplementProblem,true);return;}
+  if(target.dataset.deleteProblem){confirmProblemDelete(target.dataset.deleteProblem);return;}
+  if(target.dataset.view){if(!discardProblemDraft())return;state.view=target.dataset.view;state.problemIds=null;state.relationTitle='';delete state.filters.ids;state.page=1;render();return;}
   if(target.dataset.item){detail(target.dataset.item);return;}
   if(target.dataset.week){const list=state.items.filter(i=>String(i.weekIndex)===target.dataset.week);openDialog(`<h2>${esc(list[0]?.week)}的问题</h2>${issueTable(list)}`);return;}
   if(target.dataset.action){state.busy=true;target.disabled=true;try{await act(target.dataset.action,target);}catch(err){notify(err.message,true);}finally{target.disabled=false;state.busy=false;}}
@@ -169,6 +182,7 @@ document.addEventListener('click',async e=>{
 document.addEventListener('submit',async e=>{
   e.preventDefault();if(state.busy)return;state.busy=true;const form=e.target,button=form.querySelector('button[type="submit"],button.primary');if(button)button.disabled=true;
   try{
+    if(form.classList.contains('problem-form')){await saveProblemForm(form);}
     if(form.getAttribute('id')==='login-form'){await api('/api/login',{key:new FormData(form).get('key')});await boot();}
     if(form.getAttribute('id')==='static-create-form'){
       const config=formConfig(form),filename=new FormData(form).get('sourceFile').trim();
@@ -179,12 +193,12 @@ document.addEventListener('submit',async e=>{
     if(form.getAttribute('id')==='create-form'){const p=await api('/api/projects',formConfig(form));$('#dialog').close();state.view='imports';await loadProjects(p.id);notify('项目已创建，上传问题表即可开始');}
     if(form.getAttribute('id')==='settings-form'){await api(endpoint(),{...formConfig(form),revision:state.project.revision});await loadProjects();notify('项目设置已更新');}
     if(form.getAttribute('id')==='mapping-form'){const mapping=Object.fromEntries(new FormData(form));state.upload.mapping=mapping;state.preview=await api(endpoint('preview'),{token:state.upload.token,mapping});render();}
-  }catch(err){if(form.getAttribute('id')==='login-form')$('#login-error').textContent=err.message;else notify(err.message,true);}finally{if(button)button.disabled=false;state.busy=false;}
+  }catch(err){if(form.getAttribute('id')==='login-form')$('#login-error').textContent=err.message;else if(form.classList.contains('problem-form'))form.querySelector('[role=alert]').textContent=err.message;else notify(err.message,true);}finally{if(button)button.disabled=false;state.busy=false;}
 });
 document.addEventListener('change',async e=>{
   const t=e.target;if(state.busy){if(t.id==='project-select')t.value=state.project?.id||'';return;}state.busy=true;
   try{
-    if(t.id==='project-select'&&t.value){t.disabled=true;if(state.static)await staticProject(t.value);else await loadProject(t.value);}
+    if(t.id==='project-select'&&t.value){if(!discardProblemDraft()){t.value=state.project.id;return;}t.disabled=true;if(state.static)await staticProject(t.value);else await loadProject(t.value);}
     if(t.id==='report-file'){t.disabled=true;await importReport(t.files[0]);t.value='';}
     if(t.id==='file'){t.disabled=true;await uploadFile(t.files[0]);}
     if(t.id==='sheet'){t.disabled=true;await uploadFile(state.file,t.value);}
@@ -192,7 +206,15 @@ document.addEventListener('change',async e=>{
   }catch(err){notify(err.message,true);}finally{t.disabled=false;state.busy=false;}
 });
 document.addEventListener('input',e=>{if(e.target.id==='search'){state.filters.query=e.target.value;state.page=1;$('#issue-results').innerHTML=issueResults();}});
-$('#dialog').addEventListener('click',e=>{if(e.target===$('#dialog'))$('#dialog').close();});
+$('#dialog').addEventListener('click',e=>{if(e.target===$('#dialog')&&!state.busy&&discardProblemDraft())$('#dialog').close();});
+$('#dialog').addEventListener('cancel',e=>{if(state.busy||!discardProblemDraft())e.preventDefault();});
+window.addEventListener('beforeunload',e=>{if(document.querySelector('.problem-form[data-dirty="true"]')){e.preventDefault();e.returnValue='';}});
+document.addEventListener('input',e=>{
+  const form=e.target.closest('.problem-form');if(form&&e.target.name)form.dataset.dirty='true';
+  if(e.target.id==='problem-search')$('#problem-records').innerHTML=problemRecords(e.target.value);
+  if(e.target.id.endsWith('problem-link-search')){const q=e.target.value.toLowerCase();form.querySelectorAll('.problem-options label').forEach(l=>l.hidden=!l.textContent.toLowerCase().includes(q));}
+});
+document.addEventListener('change',e=>{const f=e.target.closest('.problem-form');if(f&&e.target.name)f.dataset.dirty='true';});
 boot();
 
 function sourceView(){

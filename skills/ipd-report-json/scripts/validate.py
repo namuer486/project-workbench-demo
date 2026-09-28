@@ -156,7 +156,7 @@ def validate(report):
             refs(item["dimensionIds"], dimension_ids, item["id"])
             refs(item["issueIds"], issue_ids, item["id"])
             refs(item["caseIds"], cases, item["id"])
-            if not item["issueIds"] and not item["caseIds"]:
+            if not item["issueIds"] and not item["caseIds"] and item.get("origin") != "manual":
                 errors.append(item["id"] + ": 必须关联研究案例或开发明细")
         for problem in report["projectProblems"]:
             refs(problem["evidenceRefs"], evidence_ids, problem["id"], True)

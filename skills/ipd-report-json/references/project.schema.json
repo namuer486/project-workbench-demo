@@ -222,7 +222,8 @@
                 "type": "string",
                 "enum": [
                   "source",
-                  "ai"
+                  "ai",
+                  "manual"
                 ]
               },
               "evidenceRefs": {
@@ -261,7 +262,8 @@
                 "type": "string",
                 "enum": [
                   "source",
-                  "ai"
+                  "ai",
+                  "manual"
                 ]
               },
               "evidenceRefs": {
@@ -373,7 +375,8 @@
                 "type": "string",
                 "enum": [
                   "source",
-                  "ai"
+                  "ai",
+                  "manual"
                 ]
               },
               "evidenceRefs": {
@@ -410,7 +413,8 @@
                   "type": "string",
                   "enum": [
                     "source",
-                    "ai"
+                    "ai",
+                    "manual"
                   ]
                 },
                 "evidenceRefs": {
@@ -450,7 +454,8 @@
                 "type": "string",
                 "enum": [
                   "source",
-                  "ai"
+                  "ai",
+                  "manual"
                 ]
               },
               "evidenceRefs": {
@@ -488,7 +493,8 @@
                 "type": "string",
                 "enum": [
                   "source",
-                  "ai"
+                  "ai",
+                  "manual"
                 ]
               },
               "evidenceRefs": {
@@ -542,6 +548,39 @@
             },
             "uniqueItems": true,
             "maxItems": 20000
+          },
+          "origin": {
+            "type": "string",
+            "enum": [
+              "manual"
+            ]
+          },
+          "category": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "minLength": 1,
+            "maxLength": 100,
+            "pattern": "\\S"
+          },
+          "severity": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "minLength": 1,
+            "maxLength": 50,
+            "pattern": "\\S"
+          },
+          "source": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "minLength": 1,
+            "maxLength": 200,
+            "pattern": "\\S"
           }
         },
         "required": [
@@ -612,7 +651,8 @@
                 "type": "string",
                 "enum": [
                   "source",
-                  "ai"
+                  "ai",
+                  "manual"
                 ]
               },
               "evidenceRefs": {
@@ -649,7 +689,8 @@
                   "type": "string",
                   "enum": [
                     "source",
-                    "ai"
+                    "ai",
+                    "manual"
                   ]
                 },
                 "evidenceRefs": {
@@ -1028,7 +1069,8 @@
               "type": "string",
               "enum": [
                 "source",
-                "ai"
+                "ai",
+                "manual"
               ]
             },
             "evidenceRefs": {
@@ -1067,7 +1109,8 @@
               "type": "string",
               "enum": [
                 "source",
-                "ai"
+                "ai",
+                "manual"
               ]
             },
             "evidenceRefs": {
@@ -1308,7 +1351,8 @@
           "type": "string",
           "enum": [
             "source",
-            "ai"
+            "ai",
+            "manual"
           ]
         },
         "evidenceRefs": {

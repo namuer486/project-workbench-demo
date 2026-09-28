@@ -82,7 +82,7 @@ function validateIPD(report,schema){
     [...report.ipd.focus,...report.ipd.nextInputs].forEach(v=>content(v,'ipd'));
     [...report.projectProblems,...report.insights].forEach(i=>{
       refs(i.dimensionIds,dimensions,i.id);refs(i.issueIds,issues,i.id);refs(i.caseIds,cases,i.id);
-      if(!i.issueIds.length&&!i.caseIds.length)fail(i.id,'必须关联研究案例或开发明细');
+      if(!i.issueIds.length&&!i.caseIds.length&&i.origin!=='manual')fail(i.id,'必须关联研究案例或开发明细');
     });
     report.projectProblems.forEach(p=>{
       refs(p.evidenceRefs,evidence,p.id,true);
@@ -133,7 +133,7 @@ function showEvidence(refs){
 }
 function metricValue(m){return m.value===null?'—':esc(m.value)+({percent:'%',score:' 分',count:' 次',minutes:' 分钟',ratio:''}[m.unit]||'');}
 function contentBlock(value){
-  return value?`<div class="derived-content"><span class="pill ${value.origin==='ai'?'orange':'gray'}">${value.origin==='ai'?'AI 提炼 · 待验证':'原文记录'}</span><p>${esc(value.text)}</p>${evidenceButton(value.evidenceRefs)}</div>`:'<p class="muted small">资料未提供</p>';
+  return value?`<div class="derived-content"><span class="pill ${value.origin==='ai'?'orange':'gray'}">${value.origin==='ai'?'AI 提炼 · 待验证':value.origin==='manual'?'人工填写':'原文记录'}</span><p>${esc(value.text)}</p>${evidenceButton(value.evidenceRefs)}</div>`:'<p class="muted small">资料未提供</p>';
 }
 function dimensionTags(ids){return `<div class="tags">${ids.map(id=>`<span class="tag">${esc(IPD_DIMENSIONS[id])}</span>`).join('')}</div>`;}
 function caseCard(c){
@@ -152,7 +152,7 @@ function reportView(){
     `<div class="metrics">${stats.map(([label,value,note])=>`<div class="metric"><div class="label">${label}</div><strong>${value}</strong><small>${note}</small></div>`).join('')}</div>`+
     `<div class="panel-head"><div><h2>六维体验拆解</h2><p>指标来自报告，问题与提炼按维度关联</p></div>${selected?'<button data-dimension="">查看全部维度</button>':''}</div><div class="dimension-grid">${r.dimensions.map(d=>dimensionCard(d,selected)).join('')}</div>`+
     `<section class="panel"><div class="panel-head"><div><h2>${selected?esc(IPD_DIMENSIONS[selected])+' · ':''}通用性提炼</h2><p>从具体问题中提炼共性，保留事实与推断的边界</p></div><span class="pill gray">${insights.length} 条</span></div>${insights.length?insights.map(insightCard).join(''):empty('暂无通用性提炼',r.schemaVersion==='1.0'?'当前是旧版资料 JSON。使用新版 Skill 补充项目级问题和通用提炼。':'该范围暂无有依据的提炼，不自动补齐。')}</section>`+
-    `<section class="panel"><div class="panel-head"><div><h2>${selected?esc(IPD_DIMENSIONS[selected])+' · ':''}项目级问题</h2><p>把体验问题展开为目标、关键成功因素、解决方案和复盘</p></div><button data-view="timeline">查看时间轴 →</button></div>${problems.filter(p=>!selected||p.dimensionIds.includes(selected)).map(p=>`<div class="timeline-item"><div><button class="link-btn" data-problem="${esc(p.id)}">${esc(p.title)}</button><p>${esc(p.id)} · ${p.caseIds.length} 个案例 · ${p.issueIds.length} 条开发明细</p></div>${pill(p.status)}</div>`).join('')||'<p class="muted">暂无已整理的项目级问题</p>'}</section>`+
+    `<section class="panel"><div class="panel-head"><div><h2>${selected?esc(IPD_DIMENSIONS[selected])+' · ':''}项目级问题</h2><p>把体验问题展开为目标、关键成功因素、解决方案和复盘</p></div><div class="actions">${canEditProblems()?'<button class="primary" data-view="submit">＋ 新增问题</button>':''}<button data-view="timeline">查看时间轴 →</button></div></div>${problems.filter(p=>!selected||p.dimensionIds.includes(selected)).map(p=>`<div class="timeline-item"><div><button class="link-btn" data-problem="${esc(p.id)}">${esc(p.title)}</button><p>${esc(p.id)} · ${p.caseIds.length} 个案例 · ${p.issueIds.length} 条开发明细</p></div><div>${pill(p.status)}${problemActions(p)}</div></div>`).join('')||'<p class="muted">暂无已整理的项目级问题</p>'}</section>`+
     `<details class="panel research-inputs"><summary>研究输入与具体案例 · ${cases.length} 个</summary><p class="muted">${esc(r.study.title)} · ${esc(r.study.reportDate||'日期未提供')} · 样本 ${r.study.sampleSize??'未提供'} · ${esc(r.study.method||'方法未提供')}</p>${evidenceButton(r.study.evidenceRefs,'研究依据')}${cases.map(caseCard).join('')||'<p class="muted">该维度暂无案例</p>'}</details>`+
     `<details class="panel"><summary>待核对事项 · ${r.openQuestions.length} 项</summary>${r.openQuestions.map(q=>`<div class="question-row"><h3>${esc(q.question)}</h3><p class="muted">${esc(q.reason)}</p></div>`).join('')||'<p class="muted">未列出待核对事项</p>'}</details>`;
 }
@@ -167,11 +167,11 @@ function insightCard(i){
 function relationBanner(){return state.relationTitle?`<div class="notice relation-banner">关联范围：${esc(state.relationTitle)} <button class="subtle small" data-action="clear-relation">清除关联筛选</button></div>`:'';}
 function projectTimeline(){
   const list=[...(state.report.projectProblems||[])].filter(p=>!state.problemIds||state.problemIds.includes(p.id)).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
-  return pageHead('项目问题时间轴','项目级问题按提出日期排列；缺失日期独立显示，不沿用开发明细的日期。')+relationBanner()+`<section class="panel">${list.length?list.map(p=>`<div class="timeline-group"><h3>${esc(p.date||'日期待补充')}</h3><div class="timeline-item"><div><button class="link-btn" data-problem="${esc(p.id)}">${esc(p.title)}</button><p>${esc(p.id)} · ${esc(p.owner||'负责人未提供')} · ${esc(p.version||'版本未提供')}</p>${dimensionTags(p.dimensionIds)}</div>${pill(p.status)}</div><div class="problem-summary"><h4>目标</h4>${contentBlock(p.goal)}<p class="small muted">${p.caseIds.length} 个研究案例 · ${p.issueIds.length} 条开发明细</p><button class="subtle small" data-problem="${esc(p.id)}">展开 KSF、方案与复盘 →</button></div></div>`).join(''):empty('暂无关联项目问题','使用项目拆解 JSON 补充有来源的项目级问题。')}</section>`;
+  return pageHead('项目问题时间轴','项目级问题按提出日期排列；缺失日期独立显示，不沿用开发明细的日期。',canEditProblems()?'<button class="primary" data-view="submit">＋ 新增问题</button>':'')+relationBanner()+`<section class="panel">${list.length?list.map(p=>`<div class="timeline-group"><h3>${esc(p.date||'日期待补充')}</h3><div class="timeline-item"><div><button class="link-btn" data-problem="${esc(p.id)}">${esc(p.title)}</button><p>${esc(p.id)} · ${esc(p.owner||'负责人未提供')} · ${esc(p.version||'版本未提供')}</p>${dimensionTags(p.dimensionIds)}</div>${pill(p.status)}</div><div class="problem-summary">${problemActions(p)}<h4>目标</h4>${contentBlock(p.goal)}<p class="small muted">${p.caseIds.length} 个研究案例 · ${p.issueIds.length} 条开发明细</p><button class="subtle small" data-problem="${esc(p.id)}">展开 KSF、方案与复盘 →</button></div></div>`).join(''):empty('暂无关联项目问题','使用项目拆解 JSON 补充有来源的项目级问题。')}</section>`;
 }
 function showProblem(id){
   const p=state.report.projectProblems?.find(p=>p.id===id);if(!p)return;
-  openDialog(`<h2>${esc(p.title)}</h2><p class="muted">${esc(p.id)} · ${esc(p.date||'日期未提供')} · ${esc(p.owner||'负责人未提供')}</p>${pill(p.status)}${dimensionTags(p.dimensionIds)}<div class="problem-detail"><section><h3>目标</h3>${contentBlock(p.goal)}</section><section><h3>KSF · 关键成功因素</h3>${p.ksf.length?p.ksf.map(contentBlock).join(''):'<p class="muted">资料未提供</p>'}</section><section><h3>解决方案</h3>${contentBlock(p.solution)}</section><section><h3>复盘结果</h3>${contentBlock(p.review)}</section></div><h3>关联研究案例</h3><div class="case-links">${caseLinks(p.caseIds)||'<p class="muted">暂无关联</p>'}</div><h3>关联开发明细</h3><div class="case-links">${issueLinks(p.issueIds)}</div>${evidenceButton(p.evidenceRefs,'项目问题依据')}`);
+  openDialog(`<h2>${esc(p.title)}</h2><p class="muted">${esc(p.id)} · ${esc(p.date||'日期未提供')} · ${esc(p.owner||'负责人未提供')}</p>${pill(p.status)}${dimensionTags(p.dimensionIds)}<div class="problem-detail"><section><h3>目标</h3>${contentBlock(p.goal)}</section><section><h3>KSF · 关键成功因素</h3>${p.ksf.length?p.ksf.map(contentBlock).join(''):'<p class="muted">资料未提供</p>'}</section><section><h3>解决方案</h3>${contentBlock(p.solution)}</section><section><h3>复盘结果</h3>${contentBlock(p.review)}</section></div><h3>关联研究案例</h3><div class="case-links">${caseLinks(p.caseIds)||'<p class="muted">暂无关联</p>'}</div><h3>关联开发明细</h3><div class="case-links">${issueLinks(p.issueIds)}</div>${evidenceButton(p.evidenceRefs,'项目问题依据')}${problemActions(p)}`);
 }
 
 function reportSourceView(){
@@ -188,4 +188,73 @@ function reportSaveBanner(){
 }
 function reportImportsView(){
   return pageHead('项目数据','导入 GPT 生成的完整项目 JSON，保存后所有成员读取同一份数据。',`<button class="primary" data-action="load-report">导入新版 JSON</button><button data-action="export-report">下载当前 JSON</button>`)+`<section class="panel"><h2>服务器已保存</h2><p>${esc(state.project.name)} · 版本 ${state.project.revision} · ${esc(dateLabel(state.project.updated))}</p><p class="muted">项目资料和提炼关系保存在本机数据库。再次导入同一项目 ID 会完整更新；保存前会校验并提示。已有只读链接继续指向最新版本。</p></section><section class="panel"><h2>最近保存记录</h2>${state.history.map(h=>`<p>版本 ${h.revision} · ${esc(dateLabel(h.created))}</p>`).join('')}</section>`;
+}
+
+function canEditProblems(){return !readonly()&&state.report?.schemaVersion==='2.0';}
+function problemActions(p){
+  if(!canEditProblems())return '';
+  return `<div class="actions problem-actions"><button class="small" data-edit-problem="${esc(p.id)}">编辑</button>${p.status!=='已解决'?`<button class="small" data-supplement-problem="${esc(p.id)}">补交方案</button>`:''}<button class="danger small" data-delete-problem="${esc(p.id)}">删除</button></div>`;
+}
+function problemForm(p=null){
+  const prefix=p?'edit-problem':'problem';
+  const field=(key,label,limit,value='',type='text')=>`<div class="field"><label for="${prefix}-${key}">${label}</label><input id="${prefix}-${key}" name="${key}" type="${type}" maxlength="${limit}" value="${esc(value||'')}"></div>`;
+  const area=(key,label,hint,value,required=false)=>`<section class="problem-step"><h3>${label}</h3><div class="field"><label for="${prefix}-${key}" class="small muted">${hint}</label><textarea id="${prefix}-${key}" name="${key}" maxlength="${key==='ksf'?40000:4000}" ${required?'required':''}>${esc(value||'')}</textarea></div></section>`;
+  const options=(key,items)=>`<div class="problem-options">${items.map(i=>`<label><input type="checkbox" name="${key}" value="${esc(i.id)}" ${(p?.[key]||[]).includes(i.id)?'checked':''}><span>${esc(i.title)} <small class="muted">${esc(i.id)}</small></span></label>`).join('')||'<p class="muted">暂无可关联条目，可以先保存问题。</p>'}</div>`;
+  return `<form class="problem-form" id="${prefix}-form" data-id="${esc(p?.id||'')}" data-project-id="${esc(state.project.id)}" data-revision="${state.project.revision}">
+    <p class="notice">目标 → KSF → 解决方案 → 复盘。方案未定时，可先保存为未解决，后续补交。</p>
+    <div class="field"><label for="${prefix}-title">事项标题 *</label><input autofocus id="${prefix}-title" name="title" maxlength="200" required value="${esc(p?.title||'')}" placeholder="一句话概括，例如：同屏单位增多时战斗卡顿"></div>
+    ${area('goal','1 · 正确的目标','目标成果'+(p?'':' *')+'：希望达成什么可验证的结果？',p?.goal?.text,!p)}
+    ${area('ksf','2 · 关键成功要素 KSF','每行一条，列出达成目标的关键点',p?.ksf.map(v=>v.text).join('\n'))}
+    ${area('solution','3 · 解决方案','可填写多套备选；尚未确定时可以留空',p?.solution?.text)}
+    ${area('review','4 · 复盘反思','如何验证、何时复盘、实际结果是什么？',p?.review?.text)}
+    <div class="form-grid">
+      ${field('category','事项分类',100,p?.category)}
+      <div class="field"><label for="${prefix}-severity">严重程度</label><select id="${prefix}-severity" name="severity">${['','高','中','低',...(p?.severity&&!['高','中','低'].includes(p.severity)?[p.severity]:[])].map(v=>`<option value="${esc(v)}" ${v===(p?.severity||'')?'selected':''}>${esc(v||'未标注')}</option>`).join('')}</select></div>
+      ${field('date','提出日期',10,p?.date,'date')}${field('source','来源（周会 / 跑测 / 复盘等）',200,p?.source)}
+      ${field('owner','负责人',120,p?.owner)}${field('version','所属版本',80,p?.version)}
+    </div>
+    <fieldset class="problem-dimensions"><legend>衡量标签 · 可多选</legend>${Object.entries(IPD_DIMENSIONS).map(([id,name])=>`<label><input type="checkbox" name="dimensionIds" value="${id}" ${p?.dimensionIds.includes(id)?'checked':''}>${name}</label>`).join('')}<p class="small muted">不确定归属可暂不选，后续补充；不会据此生成评分。</p></fieldset>
+    <div class="field"><label for="${prefix}-status">解决状态 *</label><select id="${prefix}-status" name="status">${['未解决','进行中','待验证','已解决','未标注'].map(s=>`<option ${s===(p?.status||'未解决')?'selected':''}>${s}</option>`).join('')}</select><small>选择“已解决”时需填写解决方案；补交方案不会自动改变状态。</small></div>
+    <details class="problem-relations"><summary>关联案例与开发明细（可稍后补充）</summary><label for="${prefix}-link-search">搜索可关联条目</label><input id="${prefix}-link-search" type="search" placeholder="按标题或编号筛选"><h3>关联案例</h3>${options('caseIds',state.report.cases)}<h3>关联开发明细</h3>${options('issueIds',state.report.issues)}</details>
+    <p class="inline-error" role="alert"></p>
+    <div class="form-actions"><button type="button" data-action="${p||$('#dialog').open?'close-dialog':'reset-problem'}">${p||$('#dialog').open?'取消':'清空重填'}</button><button type="submit" class="primary">${p?'保存修改':'提交记录'}</button></div>
+  </form>`;
+}
+function problemSubmitView(){
+  if(!canEditProblems())return empty('只读项目','请在已保存的新版项目工作台中提交问题。');
+  return pageHead('项目问题提交','直接登记、补交和维护项目问题，保存后同步到项目提炼与时间轴。')+`<div class="problem-workspace"><section class="panel"><h2>提交项目问题 · 解决方案</h2>${problemForm()}</section><section class="panel"><div class="panel-head"><h2>项目问题记录</h2><span class="pill gray">${state.report.projectProblems.length} 条</span></div><p class="small muted">展示导入与人工维护的全部项目级问题。</p><label for="problem-search">搜索问题</label><input id="problem-search" type="search" placeholder="标题 / 负责人 / 分类"><div id="problem-records">${problemRecords()}</div></section></div>`;
+}
+function problemRecords(query=''){
+  const list=[...state.report.projectProblems].reverse().filter(p=>[p.title,p.owner,p.category].join(' ').toLowerCase().includes(query.toLowerCase()));
+  return list.map(p=>`<article class="problem-record"><button class="link-btn" data-problem="${esc(p.id)}">${esc(p.title)}</button><div class="actions">${pill(p.status)}${p.category?`<span class="tag">${esc(p.category)}</span>`:''}${p.severity?`<span class="tag">严重程度：${esc(p.severity)}</span>`:''}${p.origin==='manual'?'<span class="tag">人工维护</span>':''}</div>${dimensionTags(p.dimensionIds)}<p class="small">${esc(p.goal?.text||'目标待补充')}</p><p class="small muted">${esc(p.date||'日期未标注')} · ${esc(p.owner||'负责人未标注')} · ${esc(p.source||'来源见依据')}</p>${problemActions(p)}</article>`).join('')||'<p class="muted">暂无匹配的问题，可在左侧提交。</p>';
+}
+function openProblemEditor(id,supplement=false){
+  if(!canEditProblems()||!discardProblemDraft())return;
+  const p=state.report.projectProblems.find(p=>p.id===id);if(!p)return;
+  openDialog(`<h2>${supplement?'补交解决方案':'编辑项目问题'}</h2>${problemForm(p)}`);
+  $('#dialog').classList.add('problem-editor');
+  if(supplement)$('#dialog [name=solution]').focus();
+}
+function confirmProblemDelete(id){
+  if(!canEditProblems()||!discardProblemDraft())return;
+  const p=state.report.projectProblems.find(p=>p.id===id);if(!p)return;
+  const links=state.report.insights.filter(i=>i.projectProblemIds.includes(id)).length;
+  openDialog(`<h2>确认删除这条项目问题？</h2><p>${esc(p.title)}</p><p class="notice warning">删除后会从项目提炼和时间轴移除${links?`，并解除 ${links} 条通用提炼中的关联`:''}。原始案例、开发明细和历史版本会保留。</p><div class="form-actions"><button autofocus data-action="close-dialog">取消</button><button class="danger" data-action="confirm-delete-problem" data-problem-id="${esc(id)}" data-project-id="${esc(state.project.id)}" data-revision="${state.project.revision}">确认删除</button></div>`);
+}
+function discardProblemDraft(){
+  const forms=[...document.querySelectorAll('.problem-form')].filter(f=>f.dataset.dirty==='true');
+  if(forms.length&&!confirm('有尚未保存的问题内容，确定放弃这些修改吗？'))return false;
+  forms.forEach(f=>{f.dataset.dirty='false';});return true;
+}
+async function refreshProblems(view){
+  await loadProjects(state.project.id);state.view=view;state.problemIds=null;state.relationTitle='';render();
+}
+async function saveProblemForm(form){
+  if(!canEditProblems()||form.dataset.projectId!==state.project.id)throw new Error('项目已变化，请重新打开表单');
+  const f=new FormData(form),fields=Object.fromEntries(f);
+  for(const key of ['dimensionIds','caseIds','issueIds'])fields[key]=f.getAll(key);
+  const view=state.view;
+  await api(endpoint('problems'),{operation:form.dataset.id?'update':'create',id:form.dataset.id||null,revision:Number(form.dataset.revision),fields});
+  form.dataset.dirty='false';$('#dialog').close();
+  await refreshProblems(view);notify('项目问题已保存');
 }

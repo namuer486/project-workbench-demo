@@ -324,6 +324,75 @@ class HttpTests(unittest.TestCase):
         self.assertEqual(error.exception.code,403)
         self.assertEqual(self.request("/api/projects", CONFIG, origin="https://public.example", authenticated=False)[0],403)
 
+    def test_online_problem_lifecycle_and_export(self):
+        from ipd import contract
+        self.login()
+        report = self.report()
+        _, preview = self.request('/api/reports/preview', {'report': report})
+        _, saved = self.request('/api/reports/commit', {'token': preview['token']})
+        path = '/api/projects/' + saved['projectId']
+        fields = {k: '' for k in ('title','owner','version','category','severity','source','date','status','goal','solution','review','ksf')}
+        fields.update(title='人工登记问题', goal='可验证的目标', status='未解决', ksf='第一项\n第二项',
+                      category='性能', severity='高', source='跑测', dimensionIds=[], caseIds=[], issueIds=[])
+        payload = {'operation':'create', 'revision':1, 'fields':fields}
+        self.assertEqual(self.request(path+'/problems', payload, authenticated=False)[0],401)
+        self.assertEqual(self.request(path+'/problems', payload, origin='https://unrelated.example')[0],403)
+        self.assertEqual(self.request(path+'/problems', payload | {'fields':fields | {'status':'已解决'}})[0],400)
+        status, saved = self.request(path+'/problems', payload)
+        self.assertEqual(status,200)
+        pid = saved['problemId']
+        _, current = self.request(path+'/report')
+        problem = next(p for p in current['projectProblems'] if p['id']==pid)
+        self.assertEqual(problem['origin'],'manual')
+        self.assertEqual(problem['goal']['origin'],'manual')
+        self.assertEqual(problem['caseIds'],[])
+        self.assertEqual(problem['issueIds'],[])
+        self.assertEqual(len(problem['ksf']),2)
+        self.assertEqual(contract.validate(current),[])
+        self.assertEqual(self.request('/api/reports/preview',{'report':current})[0],200)
+        update = {'operation':'update','id':pid,'revision':saved['revision'],'fields':fields | {'solution':'后续方案'}}
+        self.assertEqual(self.request(path+'/problems',update | {'revision':1})[0],409)
+        self.assertEqual(self.request(path+'/problems',update | {'fields':fields | {'caseIds':['missing']}})[0],400)
+        self.assertEqual(self.request(path+'/problems',update)[0],200)
+        current = Store(self.temp.name).snapshot(saved['projectId'])
+        changed = next(p for p in current['report']['projectProblems'] if p['id']==pid)
+        self.assertEqual(changed['status'],'未解决')
+        self.assertEqual(changed['solution']['text'],'后续方案')
+        self.assertEqual(changed['goal'],problem['goal'])
+        self.assertEqual(changed['ksf'],problem['ksf'])
+        self.assertEqual(len(current['history']),3)
+        revision = current['project']['revision']
+        delete = {'operation':'delete','id':pid,'revision':revision,'confirmed':True}
+        self.assertEqual(self.request(path+'/problems',delete | {'confirmed':False})[0],400)
+        self.assertEqual(self.request(path+'/problems',delete)[0],200)
+        after = self.request(path+'/report')[1]
+        self.assertEqual(after['projectProblems'],report['projectProblems'])
+        self.assertEqual(after['cases'],report['cases'])
+        self.assertEqual(after['issues'],report['issues'])
+
+    def test_online_edit_retains_imported_evidence_and_delete_unlinks_insights(self):
+        self.login()
+        report = self.report()
+        self.app.store.save_report(self.app.store.preview_report(report))
+        path = '/api/projects/' + report['project']['id']
+        p = report['projectProblems'][0]
+        fields = {k:p.get(k) or '' for k in ('title','owner','version','category','severity','source','date','status')}
+        fields.update({k:p[k]['text'] if p[k] else '' for k in ('goal','solution','review')})
+        fields.update({k:p[k] for k in ('dimensionIds','caseIds','issueIds')})
+        fields['ksf']='\n'.join(v['text'] for v in p['ksf'])
+        fields['owner']='测试负责人'
+        status,saved=self.request(path+'/problems',{'operation':'update','id':p['id'],'revision':1,'fields':fields})
+        self.assertEqual(status,200)
+        updated=self.request(path+'/report')[1]['projectProblems'][0]
+        self.assertEqual(updated['goal'],p['goal'])
+        self.assertEqual(updated['solution'],p['solution'])
+        self.assertTrue(set(p['evidenceRefs']).issubset(updated['evidenceRefs']))
+        self.assertEqual(self.request(path+'/problems',{'operation':'delete','id':p['id'],'revision':saved['revision'],'confirmed':True})[0],200)
+        after=self.request(path+'/report')[1]
+        self.assertTrue(all(p['id'] not in i['projectProblemIds'] for i in after['insights']))
+        self.assertEqual(after['cases'],report['cases'])
+        self.assertEqual(after['issues'],report['issues'])
+
 
 if __name__ == "__main__":
     unittest.main()
