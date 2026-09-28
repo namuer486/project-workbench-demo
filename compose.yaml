@@ -1,0 +1,20 @@
+services:
+  workbench:
+    build:
+      context: .
+      dockerfile: platform/Dockerfile
+    ports:
+      - "127.0.0.1:8765:8765"
+    volumes:
+      - workbench-data:/app/data
+    environment:
+      WORKBENCH_ADMIN_KEY: ${WORKBENCH_ADMIN_KEY:?Set a management key of at least 16 characters}
+      WORKBENCH_SECURE_COOKIE: ${WORKBENCH_SECURE_COOKIE:-0}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8765/healthz', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+volumes:
+  workbench-data:

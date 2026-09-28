@@ -1,0 +1,361 @@
+{
+  "schemaVersion": "1.0",
+  "reviewStatus": "draft",
+  "isDemo": true,
+  "project": {
+    "id": "ipd-demo",
+    "name": "IPD 研究示例 · 合成数据",
+    "startDate": "2026-09-01",
+    "stage": "核心玩法验证"
+  },
+  "study": {
+    "title": "核心玩法体验研究（合成演示）",
+    "reportDate": "2026-09-20",
+    "sampleSize": 50,
+    "method": "体验后问卷",
+    "evidenceRefs": [
+      "ev-study"
+    ]
+  },
+  "sources": [
+    {
+      "id": "report",
+      "title": "合成 IPD 研究报告",
+      "type": "ipd_report"
+    },
+    {
+      "id": "issues",
+      "title": "合成开发问题清单",
+      "type": "development_issues"
+    }
+  ],
+  "evidence": [
+    {
+      "id": "ev-study",
+      "sourceId": "report",
+      "location": "研究说明",
+      "excerpt": "本次为合成演示研究，报告日期 2026-09-20；50 人参与体验后问卷。项目起始日期 2026-09-01，当前为核心玩法验证阶段。"
+    },
+    {
+      "id": "ev-novelty",
+      "sourceId": "report",
+      "location": "六维指标表 / 新鲜感",
+      "excerpt": "新鲜感满意率 72%，有效样本 50。原始分 1.18，评分范围 -2 到 2；加权分 1.76，未提供加权分范围。"
+    },
+    {
+      "id": "ev-goals",
+      "sourceId": "report",
+      "location": "六维指标表 / 目标感",
+      "excerpt": "目标感原始分为 0，评分范围 -2 到 2。此项未注明有效样本数。"
+    },
+    {
+      "id": "ev-fun",
+      "sourceId": "report",
+      "location": "六维指标表 / 乐趣性",
+      "excerpt": "乐趣性满意率为 81%，该题有效样本数未注明。"
+    },
+    {
+      "id": "ev-time",
+      "sourceId": "report",
+      "location": "六维指标表 / 时间成本",
+      "excerpt": "平均单局时长 18 分钟，样本口径未说明。报告未给出时长评分或满意率。"
+    },
+    {
+      "id": "ev-case-new",
+      "sourceId": "report",
+      "location": "具体案例 / 遭遇变化",
+      "excerpt": "参与者提到随机事件组合带来了不同的探索体验。"
+    },
+    {
+      "id": "ev-case-goals",
+      "sourceId": "report",
+      "location": "具体案例 / 撤离目标",
+      "excerpt": "部分参与者不清楚撤离点何时开放。报告建议提前显示开放倒计时。"
+    },
+    {
+      "id": "ev-case-social",
+      "sourceId": "report",
+      "location": "具体案例 / 组队沟通",
+      "excerpt": "队友无法快速标记危险位置。报告未提供社交感定量评分。"
+    },
+    {
+      "id": "ev-dev-1",
+      "sourceId": "issues",
+      "location": "问题表 / DEV-001",
+      "excerpt": "DEV-001：撤离开放时间提示不明确。负责人演示策划甲，进行中，高优先级，引导模块，2026-09-15 提出，版本 v0.2；方案为增加开放倒计时。关联研究案例为撤离目标。"
+    },
+    {
+      "id": "ev-dev-2",
+      "sourceId": "issues",
+      "location": "问题表 / DEV-002",
+      "excerpt": "DEV-002：增加危险快捷标记。负责人、提出时间、状态和方案尚未登记。关联研究案例为组队沟通。"
+    }
+  ],
+  "dimensions": [
+    {
+      "id": "novelty",
+      "name": "新鲜感",
+      "summary": null,
+      "metrics": [
+        {
+          "id": "satisfaction",
+          "name": "满意率",
+          "value": 72,
+          "unit": "percent",
+          "scale": {
+            "min": 0,
+            "max": 100
+          },
+          "higherIsBetter": true,
+          "sampleSize": 50,
+          "evidenceRefs": [
+            "ev-novelty"
+          ],
+          "note": null
+        },
+        {
+          "id": "raw_score",
+          "name": "原始分",
+          "value": 1.18,
+          "unit": "score",
+          "scale": {
+            "min": -2,
+            "max": 2
+          },
+          "higherIsBetter": true,
+          "sampleSize": null,
+          "evidenceRefs": [
+            "ev-novelty"
+          ],
+          "note": null
+        },
+        {
+          "id": "weighted_score",
+          "name": "加权分",
+          "value": 1.76,
+          "unit": "score",
+          "scale": null,
+          "higherIsBetter": true,
+          "sampleSize": null,
+          "evidenceRefs": [
+            "ev-novelty"
+          ],
+          "note": "原文未提供加权分评分范围"
+        }
+      ]
+    },
+    {
+      "id": "goals",
+      "name": "目标感",
+      "summary": null,
+      "metrics": [
+        {
+          "id": "raw_score",
+          "name": "原始分",
+          "value": 0,
+          "unit": "score",
+          "scale": {
+            "min": -2,
+            "max": 2
+          },
+          "higherIsBetter": true,
+          "sampleSize": null,
+          "evidenceRefs": [
+            "ev-goals"
+          ],
+          "note": null
+        }
+      ]
+    },
+    {
+      "id": "growth",
+      "name": "成长感",
+      "summary": null,
+      "metrics": []
+    },
+    {
+      "id": "fun",
+      "name": "乐趣性",
+      "summary": null,
+      "metrics": [
+        {
+          "id": "satisfaction",
+          "name": "满意率",
+          "value": 81,
+          "unit": "percent",
+          "scale": {
+            "min": 0,
+            "max": 100
+          },
+          "higherIsBetter": true,
+          "sampleSize": null,
+          "evidenceRefs": [
+            "ev-fun"
+          ],
+          "note": null
+        }
+      ]
+    },
+    {
+      "id": "social",
+      "name": "社交感",
+      "summary": null,
+      "metrics": []
+    },
+    {
+      "id": "time_cost",
+      "name": "时间成本",
+      "summary": null,
+      "metrics": [
+        {
+          "id": "duration",
+          "name": "平均单局时长",
+          "value": 18,
+          "unit": "minutes",
+          "scale": null,
+          "higherIsBetter": null,
+          "sampleSize": null,
+          "evidenceRefs": [
+            "ev-time"
+          ],
+          "note": "原文未定义目标时长或评价方向"
+        }
+      ]
+    }
+  ],
+  "cases": [
+    {
+      "id": "case-new",
+      "title": "随机事件组合带来探索变化",
+      "dimensionIds": [
+        "novelty"
+      ],
+      "kind": "strength",
+      "observation": "参与者提到随机事件组合带来了不同的探索体验。",
+      "analysis": null,
+      "suggestion": null,
+      "evidenceRefs": [
+        "ev-case-new"
+      ],
+      "issueIds": []
+    },
+    {
+      "id": "case-goals",
+      "title": "撤离点开放时机不清楚",
+      "dimensionIds": [
+        "goals"
+      ],
+      "kind": "problem",
+      "observation": "部分参与者不清楚撤离点何时开放。",
+      "analysis": null,
+      "suggestion": {
+        "text": "提前显示开放倒计时。",
+        "origin": "source",
+        "evidenceRefs": [
+          "ev-case-goals"
+        ]
+      },
+      "evidenceRefs": [
+        "ev-case-goals"
+      ],
+      "issueIds": [
+        "DEV-001"
+      ]
+    },
+    {
+      "id": "case-social",
+      "title": "危险位置缺少快捷标记",
+      "dimensionIds": [
+        "social"
+      ],
+      "kind": "problem",
+      "observation": "队友无法快速标记危险位置。",
+      "analysis": {
+        "text": "可能增加语音沟通负担，需后续访谈验证。",
+        "origin": "ai",
+        "evidenceRefs": [
+          "ev-case-social"
+        ]
+      },
+      "suggestion": null,
+      "evidenceRefs": [
+        "ev-case-social"
+      ],
+      "issueIds": [
+        "DEV-002"
+      ]
+    }
+  ],
+  "issues": [
+    {
+      "id": "DEV-001",
+      "title": "撤离开放时间提示不明确",
+      "owner": "演示策划甲",
+      "status": "进行中",
+      "priority": "高",
+      "category": "引导模块",
+      "date": "2026-09-15",
+      "resolvedAt": null,
+      "solution": "增加开放倒计时",
+      "version": "v0.2",
+      "dimensionIds": [
+        "goals"
+      ],
+      "evidenceRefs": [
+        "ev-dev-1"
+      ]
+    },
+    {
+      "id": "DEV-002",
+      "title": "增加危险快捷标记",
+      "owner": null,
+      "status": "未标注",
+      "priority": null,
+      "category": null,
+      "date": null,
+      "resolvedAt": null,
+      "solution": null,
+      "version": null,
+      "dimensionIds": [
+        "social"
+      ],
+      "evidenceRefs": [
+        "ev-dev-2"
+      ]
+    }
+  ],
+  "openQuestions": [
+    {
+      "id": "q-growth",
+      "question": "补充成长感研究数据",
+      "reason": "原材料没有成长感的定量或定性内容",
+      "sourceIds": [
+        "report"
+      ]
+    },
+    {
+      "id": "q-social",
+      "question": "是否有社交感的定量结果",
+      "reason": "当前仅有具体案例",
+      "sourceIds": [
+        "report"
+      ]
+    },
+    {
+      "id": "q-samples",
+      "question": "补充各指标的有效样本和评分口径",
+      "reason": "部分指标未注明有效样本，加权分未说明范围，不能用研究总样本代填",
+      "sourceIds": [
+        "report"
+      ]
+    },
+    {
+      "id": "q-dev",
+      "question": "补充 DEV-002 的负责人、日期和处理状态",
+      "reason": "开发问题原文未登记这些字段",
+      "sourceIds": [
+        "issues"
+      ]
+    }
+  ]
+}
