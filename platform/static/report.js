@@ -118,8 +118,9 @@ async function importReport(file){
   if(!res.ok)throw new Error('无法读取报告校验规则');
   const errors=validateIPD(report,await res.json());
   if(errors.length){openDialog(`<h2>项目 JSON 校验未通过</h2><div class="notice error">${errors.length} 项错误；当前项目未被修改。</div><ul>${errors.slice(0,50).map(e=>`<li>${esc(e)}</li>`).join('')}</ul>`);return;}
+  state.pendingReport=(!state.static&&!state.share)?await api('/api/reports/preview',{report}):null;
   Object.assign(state,ipdSnapshot(report));state.localReport=true;state.view='report';state.reportDimension='';state.problemIds=null;state.relationTitle='';state.filters={};state.page=1;render();
-  notify('JSON 已加载为本地预览，尚未保存到仓库或共享给团队');
+  notify(state.pendingReport?'校验通过，请检查后点击「保存并生成项目」':'JSON 已加载为本地预览，尚未保存到仓库或共享给团队');
 }
 
 function evidenceButton(refs,label='查看依据'){
@@ -178,4 +179,13 @@ function reportSourceView(){
   const validRepo=/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repository||'');
   const sourceUrl=validRepo?'https://github.com/'+repository+'/tree/'+encodeURIComponent(state.manifest.ref||'main')+'/projects/'+encodeURIComponent(state.project.id):'';
   return pageHead('项目拆解 JSON 工作流','研究报告和开发问题交给 GPT，平台读取统一的数据合同。')+`<section class="panel"><h2>资料 → GPT + Skill → report.json → 可视化</h2><ol><li>把 IPD 研究报告和开发问题清单交给 GPT，使用 ipd-report-json Skill。</li><li>生成 v2 report.json：六维评价、研究案例、开发明细、项目级问题和通用提炼，并校验所有关联。</li><li>点击「导入项目 JSON」在当前浏览器检查项目拆解与原文依据。</li><li>将文件提交到 projects/${esc(state.project.id)}/report.json，构建成功后更新团队看板。</li></ol><div class="actions"><button class="primary" data-action="load-report">导入项目 JSON</button>${sourceUrl?`<a href="${esc(sourceUrl)}" target="_blank" rel="noreferrer">打开仓库项目目录 →</a>`:''}</div></section><section class="panel"><h3>当前数据来源</h3>${state.report.sources.map(s=>`<p>${esc(s.title)} <span class="id">${esc(s.id)}</span></p>`).join('')}<div class="notice warning">JSON 预览不上传文件，也不自动共享。仓库里只维护这一份 report.json，不要在同一个项目目录同时放旧版 project.json。</div><p class="footnote">研究指标、案例、问题清单及其原文摘录都会进入静态产物，部署时由公司访问控制统一保护。</p></section>`;
+}
+
+function reportSaveBanner(){
+  const pending=state.pendingReport;
+  if(!pending)return '<div class="share-head">当前是本地 JSON 预览，未上传或保存。刷新网页会退出预览。<button class="subtle small" data-action="refresh">退出预览</button></div>';
+  return `<div class="share-head"><div>${pending.revision===null?'将新建项目':`将完整更新「${esc(pending.previousName)}」`}: ${esc(state.project.name)} · ${state.items.length} 条开发明细 · ${state.report.projectProblems?.length||0} 个项目问题。${pending.revision!==null?'本次 JSON 会替换当前全部数据，旧版保留在服务器历史中。':''} 当前已上传到服务器临时预览，尚未保存。</div><div class="actions"><button class="primary" data-action="save-report">保存并生成项目</button><button class="subtle" data-action="refresh">取消预览</button></div></div>`;
+}
+function reportImportsView(){
+  return pageHead('项目数据','导入 GPT 生成的完整项目 JSON，保存后所有成员读取同一份数据。',`<button class="primary" data-action="load-report">导入新版 JSON</button><button data-action="export-report">下载当前 JSON</button>`)+`<section class="panel"><h2>服务器已保存</h2><p>${esc(state.project.name)} · 版本 ${state.project.revision} · ${esc(dateLabel(state.project.updated))}</p><p class="muted">项目资料和提炼关系保存在本机数据库。再次导入同一项目 ID 会完整更新；保存前会校验并提示。已有只读链接继续指向最新版本。</p></section><section class="panel"><h2>最近保存记录</h2>${state.history.map(h=>`<p>版本 ${h.revision} · ${esc(dateLabel(h.created))}</p>`).join('')}</section>`;
 }

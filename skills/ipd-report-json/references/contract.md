@@ -61,7 +61,7 @@
 
 JSON Schema 描述字段类型和结构。`scripts/validate.py` 使用标准库执行本合同所用的 Schema 关键字，并额外校验 ID 唯一、引用有效、固定维度、范围和日期关系；不是任意 JSON Schema 的通用引擎。
 
-静态工作台支持 `projects/<项目id>/report.json`，文件夹名与 `project.id` 一致。同目录不要同时维护 report.json 和旧的 project.json，以免出现两份数据来源。所有开发问题放进 report.json 的 issues。浏览器可先加载 JSON 本地预览，保存到仓库后才成为团队共享版本。
+静态工作台支持 `projects/<项目id>/report.json`，文件夹名与 `project.id` 一致。同目录不要同时维护 report.json 和旧的 project.json，以免出现两份数据来源。所有开发问题放进 report.json 的 issues。静态版浏览器加载 JSON 仅本地预览，提交仓库后才更新共享版本。本机服务版会先上传校验，点击“保存并生成项目”后写入服务器数据库；无需提交仓库。
 
 ## 项目拆解的三层关系
 

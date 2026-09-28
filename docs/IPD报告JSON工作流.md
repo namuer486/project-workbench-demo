@@ -43,7 +43,7 @@ python skills/ipd-report-json/scripts/validate.py path/to/report.json
 
 校验结构、六维、数值范围、ID 唯一性、关联完整性、日期和依据；不证明原文摘录准确，也不证明 AI 提炼正确。默认 draft，人工核对后才能标 reviewed。
 
-网页点击「导入项目 JSON」先本地预览，内容不上传、不保存到服务器数据库，刷新后退出。正式共享时提交到 `projects/my-project/report.json`，目录名与 `project.id` 一致。同项目不能同时放旧的 `project.json`。开发表仍是业务维护入口，生成 JSON 时将最新明细同步进 issues，再重新核对提炼关系。
+静态版网页点击「导入项目 JSON」仅本地预览，刷新后退出。本机服务版会先上传到服务器校验预览，点击「保存并生成项目」后持久保存；见[本机部署](本机部署.md)。静态仓库模式正式共享时提交到 `projects/my-project/report.json`，目录名与 `project.id` 一致。同项目不能同时放旧的 `project.json`。开发表仍是业务维护入口，生成 JSON 时将最新明细同步进 issues，再重新核对提炼关系。
 
 v1 JSON 继续支持，首页会显示缺少项目级提炼，平台不自行编造。可将旧 JSON 和新资料一同交给 Skill 升级；复用稳定 ID。
 

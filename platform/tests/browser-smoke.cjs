@@ -93,6 +93,29 @@ async function main(){
   await create(page,'隔离的第二个项目');
   await goView(page,'overview');
   assert.equal(await page.locator('.metric strong').first().innerText(),'0');
+  // Server JSON project: explicit save, refresh persistence, update and shared reader.
+  const serverReport=JSON.parse(fs.readFileSync(path.join(root,'projects/ipd-demo/report.json'),'utf8'));
+  await page.locator('#report-file').setInputFiles({name:'report.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(serverReport))});
+  await page.getByRole('button',{name:'保存并生成项目',exact:true}).click();
+  await page.waitForFunction(()=>state.project?.id==='ipd-demo'&&!state.localReport&&!state.busy);
+  await page.reload();await visible(page,'.dimension-grid');
+  await goView(page,'imports');
+  assert.ok((await page.locator('.content').innerText()).includes('版本 1'));
+  serverReport.project.name='已保存的 JSON 项目';
+  await page.locator('#report-file').setInputFiles({name:'report.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(serverReport))});
+  await page.getByText('本次 JSON 会替换当前全部数据，旧版保留在服务器历史中。',{exact:false}).waitFor();
+  await page.getByRole('button',{name:'保存并生成项目',exact:true}).click();
+  await page.waitForFunction(()=>state.project?.revision===2&&!state.localReport&&!state.busy);
+  await goView(page,'settings');
+  await page.getByRole('button',{name:'生成只读链接',exact:true}).click();
+  await visible(page,'.integration-code');
+  const jsonReader=await browser.newContext();const jsonShared=await jsonReader.newPage();
+  jsonShared.on('pageerror',e=>errors.push(e.message));
+  await jsonShared.goto(await page.locator('.integration-code').first().inputValue());
+  await visible(jsonShared,'.insight-card');
+  assert.equal(await jsonShared.locator('[data-action="save-report"]').count(),0);
+  assert.equal(await jsonShared.locator('[data-view="imports"]').count(),0);
+  await jsonReader.close();
   // Static build under a project subpath, without any backend API.
   const staticPage=await context.newPage();
   staticPage.on('pageerror',e=>errors.push(e.message));

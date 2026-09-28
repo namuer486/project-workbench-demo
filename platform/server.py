@@ -6,6 +6,7 @@ import csv
 import hashlib
 import hmac
 import io
+import ipaddress
 import json
 import os
 import secrets
@@ -19,6 +20,8 @@ from http.cookies import SimpleCookie
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlparse
+
+from ipd import contract, report_snapshot
 
 ROOT = Path(__file__).resolve().parent
 DEFAULT_TAGS = ["新鲜感", "目标感", "成长感", "乐趣性", "社交感", "时间成本"]
@@ -237,6 +240,9 @@ class Store:
             PRAGMA journal_mode=WAL;
             CREATE TABLE IF NOT EXISTS projects(id TEXT PRIMARY KEY, config TEXT NOT NULL, revision INTEGER NOT NULL DEFAULT 0,
                 mapping TEXT NOT NULL DEFAULT '{}', updated TEXT NOT NULL, share_hash TEXT);
+            CREATE TABLE IF NOT EXISTS reports(project_id TEXT PRIMARY KEY REFERENCES projects(id), document TEXT NOT NULL);
+            CREATE TABLE IF NOT EXISTS report_versions(project_id TEXT NOT NULL REFERENCES projects(id), revision INTEGER NOT NULL,
+                created TEXT NOT NULL, document TEXT NOT NULL, PRIMARY KEY(project_id,revision));
             CREATE TABLE IF NOT EXISTS items(project_id TEXT NOT NULL REFERENCES projects(id), id TEXT NOT NULL, data TEXT NOT NULL,
                 PRIMARY KEY(project_id,id));
             CREATE TABLE IF NOT EXISTS imports(id TEXT PRIMARY KEY, project_id TEXT NOT NULL REFERENCES projects(id), filename TEXT NOT NULL,
@@ -272,6 +278,8 @@ class Store:
         return self.project(project_id)
 
     def update(self, project_id, payload):
+        if self.project(project_id).get("mode") == "report":
+            raise Error("项目拆解请通过新版 JSON 更新，不能单独修改配置")
         config = validate_config(payload)
         with self.connect() as db:
             db.execute("BEGIN IMMEDIATE")
@@ -286,10 +294,58 @@ class Store:
             db.execute("UPDATE projects SET config=?,revision=revision+1,updated=? WHERE id=?", (dumps(config), now(), project_id))
         return self.project(project_id)
 
+    def preview_report(self, report):
+        errors = contract.validate(report)
+        if errors:
+            raise Error("项目 JSON 校验失败：" + "；".join(errors[:20]))
+        if len(dumps(report).encode("utf-8")) > MAX_FILE:
+            raise Error("项目 JSON 不能超过 10 MB", 413)
+        project_id = report["project"]["id"]
+        with self.connect() as db:
+            exists = db.execute("SELECT id FROM projects WHERE id=?", (project_id,)).fetchone()
+            project = self.project(project_id, db) if exists else None
+        if project and project.get("mode") != "report":
+            raise Error("此项目 ID 已被表格项目使用，请换一个项目 ID", 409)
+        return {"kind": "report", "projectId": project_id, "revision": project["revision"] if project else None,
+                "previousName": project["name"] if project else None, "report": report}
+
+    def save_report(self, preview):
+        report, project_id = preview["report"], preview["projectId"]
+        snapshot = report_snapshot(report, now())
+        if report["project"]["id"] != project_id:
+            raise Error("项目 ID 不匹配")
+        config = {k: v for k, v in snapshot["project"].items() if k not in ("id", "revision", "updated")}
+        config["mode"] = "report"
+        document = dumps(report)
+        with self.connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            row = db.execute("SELECT revision FROM projects WHERE id=?", (project_id,)).fetchone()
+            if (row["revision"] if row else None) != preview["revision"]:
+                raise Error("此项目已被其他人更新，请重新导入预览", 409)
+            stamp = now()
+            revision = (row["revision"] if row else 0) + 1
+            if row:
+                if self.project(project_id, db).get("mode") != "report":
+                    raise Error("不能用项目 JSON 覆盖表格项目", 409)
+                db.execute("UPDATE projects SET config=?,revision=?,updated=? WHERE id=?", (dumps(config), revision, stamp, project_id))
+            else:
+                db.execute("INSERT INTO projects(id,config,revision,updated) VALUES(?,?,?,?)", (project_id, dumps(config), revision, stamp))
+            db.execute("INSERT INTO reports VALUES(?,?) ON CONFLICT(project_id) DO UPDATE SET document=excluded.document", (project_id, document))
+            db.execute("INSERT INTO report_versions VALUES(?,?,?,?)", (project_id, revision, stamp, document))
+            db.execute("DELETE FROM items WHERE project_id=?", (project_id,))
+            db.executemany("INSERT INTO items VALUES(?,?,?)", [(project_id, i["id"], dumps(i)) for i in snapshot["items"]])
+        return {"projectId": project_id, "revision": revision}
+
     def snapshot(self, project_id):
         with self.connect() as db:
             db.execute("BEGIN")
             project = self.project(project_id, db)
+            if project.get("mode") == "report":
+                row = db.execute("SELECT document FROM reports WHERE project_id=?", (project_id,)).fetchone()
+                result = report_snapshot(json.loads(row[0]), project["updated"])
+                result["project"] = project
+                result["history"] = [dict(h) for h in db.execute("SELECT revision,created FROM report_versions WHERE project_id=? ORDER BY revision DESC LIMIT 30", (project_id,))]
+                return result
             items = [json.loads(row[0]) for row in db.execute("SELECT data FROM items WHERE project_id=? ORDER BY id", (project_id,))]
             history = [dict(row) for row in db.execute("SELECT id,filename,created,summary FROM imports WHERE project_id=? ORDER BY created DESC,rowid DESC LIMIT 30", (project_id,))]
         for entry in history:
@@ -307,6 +363,8 @@ class Store:
     def preview(self, project_id, filename, records, mapping):
         snapshot = self.snapshot(project_id)
         project = snapshot["project"]
+        if project.get("mode") == "report":
+            raise Error("项目拆解请导入完整 JSON，避免明细与提炼关系不同步")
         incoming, errors = normalize(records, mapping, project)
         before = {i["id"]: {k: i[k] for k in FIELDS} for i in snapshot["items"]}
         counts = {"added": 0, "updated": 0, "unchanged": 0, "missing": 0}
@@ -345,10 +403,11 @@ class Store:
 
 
 class App:
-    def __init__(self, directory, admin_key, secure_cookie=False):
+    def __init__(self, directory, admin_key, secure_cookie=False, require_login=True):
         self.store = Store(directory)
         self.admin_key = admin_key
         self.secure_cookie = secure_cookie
+        self.require_login = require_login
         self.lock = threading.Lock()
         self.sessions, self.uploads, self.previews, self.attempts = {}, {}, {}, {}
 
@@ -414,7 +473,20 @@ def handler_for(app):
             except (ValueError, UnicodeDecodeError) as exc:
                 raise Error("无效 JSON 请求") from exc
 
+        def local_request(self):
+            host = urlparse("http://" + self.headers.get("Host", "")).hostname or ""
+            try:
+                local_host = host == "localhost" or ipaddress.ip_address(host).is_loopback
+                local_client = ipaddress.ip_address(self.client_address[0]).is_loopback
+            except ValueError:
+                local_host = local_client = False
+            if not local_host or not local_client:
+                raise Error("当前为本机免登录模式，只允许本机地址访问", 403)
+
         def authorized(self):
+            if not app.require_login:
+                self.local_request()
+                return "local"
             cookie = SimpleCookie()
             try:
                 cookie.load(self.headers.get("Cookie", ""))
@@ -444,10 +516,12 @@ def handler_for(app):
                 self.reply({"error": "服务处理失败，请检查服务日志"}, 500)
 
         def route(self, method):
+            if not app.require_login:
+                self.local_request()
             path = urlparse(self.path).path
             parts = path.strip("/").split("/")
             if method == "GET" and path == "/healthz":
-                return self.reply({"ok": True, "service": "project-workbench"})
+                return self.reply({"ok": True, "service": "project-workbench", "version": "0.3", "features": ["project-json"], "requireLogin": app.require_login})
             if method == "GET" and (path in ("/", "/app.js", "/style.css", "/report.js") or (len(parts) == 2 and parts[0] == "share")):
                 asset = "index.html" if path == "/" or parts[0] == "share" else parts[0]
                 mime = {"index.html": "text/html", "app.js": "text/javascript", "report.js": "text/javascript", "style.css": "text/css"}[asset]
@@ -487,7 +561,19 @@ def handler_for(app):
                     return self.reply({"ok": True}, cookie=cookie)
             session = self.authorized()
             if method == "GET" and path == "/api/session":
-                return self.reply({"ok": True, "fields": FIELDS, "defaultTags": DEFAULT_TAGS})
+                return self.reply({"ok": True, "fields": FIELDS, "defaultTags": DEFAULT_TAGS, "requireLogin": app.require_login})
+            if method == "POST" and path == "/api/reports/preview":
+                preview = app.store.preview_report(body.get("report"))
+                token = app.cache(app.previews, preview)
+                return self.reply({k: v for k, v in preview.items() if k != "report"} | {"token": token})
+            if method == "POST" and path == "/api/reports/commit":
+                preview = app.cached(app.previews, body.get("token"))
+                if preview.get("kind") != "report":
+                    raise Error("请先预览项目 JSON")
+                result = app.store.save_report(preview)
+                with app.lock:
+                    app.previews.pop(body.get("token"), None)
+                return self.reply(result)
             if method == "POST" and path == "/api/logout":
                 with app.lock:
                     app.sessions.pop(session, None)
@@ -507,6 +593,13 @@ def handler_for(app):
             action = parts[3] if len(parts) == 4 else ""
             if not action and len(parts) == 3:
                 return self.reply(app.store.snapshot(project_id) if method == "GET" else app.store.update(project_id, body))
+            if method == "GET" and action == "report":
+                snapshot = app.store.snapshot(project_id)
+                if "report" not in snapshot:
+                    raise Error("该项目不是 JSON 拆解项目")
+                return self.reply(snapshot["report"])
+            if method == "POST" and action in ("upload", "preview", "commit") and project.get("mode") == "report":
+                raise Error("此项目请导入完整 JSON 更新")
             if method == "POST" and action == "upload":
                 try:
                     raw = base64.b64decode(body.get("content", ""), validate=True)
@@ -529,7 +622,7 @@ def handler_for(app):
                 return self.reply({k: v for k, v in preview.items() if k != "items"} | {"token": token})
             if method == "POST" and action == "commit":
                 preview = app.cached(app.previews, body.get("token"))
-                if preview["projectId"] != project_id:
+                if preview.get("kind") == "report" or preview["projectId"] != project_id:
                     raise Error("导入项目不匹配", 403)
                 result = app.store.commit(preview)
                 with app.lock:
@@ -560,8 +653,11 @@ def main():
         key = keyfile.read_text(encoding="utf-8").strip()
     if len(key) < 16:
         raise SystemExit("管理口令至少 16 个字符")
-    app = App(directory, key, os.environ.get("WORKBENCH_SECURE_COOKIE") == "1")
+    require_login = os.environ.get("WORKBENCH_REQUIRE_LOGIN", "1") != "0"
+    app = App(directory, key, os.environ.get("WORKBENCH_SECURE_COOKIE") == "1", require_login=require_login)
     host, port = os.environ.get("WORKBENCH_HOST", "127.0.0.1"), int(os.environ.get("WORKBENCH_PORT", "8765"))
+    if not require_login and host not in ("127.0.0.1", "localhost"):
+        raise SystemExit("免登录模式只允许绑定 127.0.0.1 或 localhost")
     server = ThreadingHTTPServer((host, port), handler_for(app))
     server.daemon_threads = True
     print(f"Workbench ready: http://{host}:{port}", flush=True)

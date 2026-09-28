@@ -208,5 +208,83 @@ class HttpTests(unittest.TestCase):
         self.assertEqual(self.request("/api/projects", ["not", "object"])[0], 400)
 
 
+    def report(self):
+        from ipd import SKILL, contract
+        return contract.load_json(SKILL / "references/example-project.json")
+
+    def test_json_project_persists_refresh_share_and_export(self):
+        report = self.report()
+        self.assertEqual(self.request("/api/reports/preview", {"report": report})[0], 401)
+        self.login()
+        _, preview = self.request("/api/reports/preview", {"report": report})
+        self.assertIsNone(preview["revision"])
+        status, saved = self.request("/api/reports/commit", {"token": preview["token"]})
+        self.assertEqual(status, 200)
+        path = "/api/projects/" + saved["projectId"]
+        _, snapshot = self.request(path)
+        self.assertEqual(snapshot["report"], report)
+        self.assertEqual(snapshot["project"]["revision"], 1)
+        self.assertEqual(Store(self.temp.name).snapshot(saved["projectId"])["report"], report)
+        self.assertEqual(self.request(path + "/report")[1], report)
+        self.assertEqual(self.request(path + "/report", authenticated=False)[0], 401)
+        _, share = self.request(path + "/share", {"enabled": True})
+        self.assertEqual(self.request(share["feed"], authenticated=False)[1]["report"], report)
+        self.assertEqual(self.request("/api/reports/commit", {"token": preview["token"]}, authenticated=False)[0], 401)
+        self.assertEqual(self.request(path, CONFIG | {"revision":1})[0], 400)
+        self.assertEqual(self.request(path + "/upload", {})[0], 400)
+        self.request(path + "/share", {"enabled":False})
+        self.assertEqual(self.request(share["feed"], authenticated=False)[0], 404)
+
+    def test_json_update_conflicts_are_atomic_and_keep_versions(self):
+        self.login()
+        report = self.report()
+        _, first = self.request("/api/reports/preview", {"report": report})
+        _, stale = self.request("/api/reports/preview", {"report": report})
+        self.request("/api/reports/commit", {"token": first["token"]})
+        self.assertEqual(self.request("/api/reports/commit", {"token":stale["token"]})[0],409)
+        _, stale = self.request("/api/reports/preview", {"report": report})
+        report["project"]["name"] = "更新后的项目"
+        report["issues"] = []
+        for item in report["cases"] + report["projectProblems"] + report["insights"]:
+            item["issueIds"] = []
+        _, update = self.request("/api/reports/preview", {"report": report})
+        self.assertEqual(self.request("/api/reports/commit", {"token":update["token"]})[0],200)
+        self.assertEqual(self.request("/api/reports/commit", {"token":stale["token"]})[0],409)
+        snapshot = self.app.store.snapshot(report["project"]["id"])
+        self.assertEqual(snapshot["project"]["name"], "更新后的项目")
+        self.assertEqual(snapshot["project"]["revision"], 2)
+        self.assertEqual(snapshot["items"], [])
+        self.assertEqual(len(snapshot["history"]),2)
+        with self.app.store.connect() as db:
+            old = db.execute("SELECT document FROM report_versions WHERE revision=1").fetchone()[0]
+        self.assertEqual(len(json.loads(old)["issues"]),2)
+
+    def test_invalid_json_never_creates_or_overwrites_project(self):
+        self.login()
+        report = self.report()
+        report["insights"][0]["projectProblemIds"] = ["missing"]
+        self.assertEqual(self.request("/api/reports/preview", {"report":report})[0],400)
+        self.assertEqual(self.request("/api/projects")[1],[])
+        self.assertEqual(self.request("/api/reports/preview", {"report":None})[0],400)
+        _, sheet = self.request("/api/projects", CONFIG)
+        report = self.report(); report["project"]["id"] = sheet["id"]
+        self.assertEqual(self.request("/api/reports/preview", {"report":report})[0],409)
+        self.assertEqual(self.app.store.snapshot(sheet["id"])["project"]["name"],CONFIG["name"])
+
+
+    def test_local_mode_no_login_persists_projects_and_rejects_remote_host(self):
+        self.app.require_login = False
+        status, session = self.request("/api/session", authenticated=False)
+        self.assertEqual(status,200)
+        self.assertFalse(session["requireLogin"])
+        _, preview = self.request("/api/reports/preview", {"report":self.report()}, authenticated=False)
+        self.assertEqual(self.request("/api/reports/commit", {"token":preview["token"]}, authenticated=False)[0],200)
+        req = urllib.request.Request(self.base + "/api/projects", headers={"Host":"public.example"})
+        with self.assertRaises(urllib.error.HTTPError) as error:
+            urllib.request.urlopen(req)
+        self.assertEqual(error.exception.code,403)
+        self.assertEqual(self.request("/api/projects", CONFIG, origin="https://public.example", authenticated=False)[0],403)
+
+
 if __name__ == "__main__":
     unittest.main()
