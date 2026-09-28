@@ -1,0 +1,127 @@
+// Run from the repository: node platform/tests/browser-smoke.cjs
+// Needs Playwright. Optional env: PYTHON, PLAYWRIGHT_MODULE, BROWSER_EXECUTABLE.
+// Starts isolated loopback-only servers and temporary databases; never publishes.
+const fs=require('node:fs');
+const os=require('node:os');
+const path=require('node:path');
+const assert=require('node:assert/strict');
+const {spawn,spawnSync}=require('node:child_process');
+const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
+const root=path.resolve(__dirname,'../..');
+const temporary=fs.mkdtempSync(path.join(os.tmpdir(),'workbench-browser-'));
+const output=path.join(root,'test-results');fs.mkdirSync(output,{recursive:true});
+const python=process.env.PYTHON||'python';
+const key='isolated-browser-test-key-123456';
+const backendPort=18765,staticPort=18766;
+const subprocesses=[];
+let browser;
+let logs='';
+function start(args,env={}){const child=spawn(python,args,{cwd:root,env:{...process.env,...env},windowsHide:true,stdio:['ignore','pipe','pipe']});subprocesses.push(child);child.stdout.on('data',d=>logs+=d);child.stderr.on('data',d=>logs+=d);return child;}
+async function ready(url){for(let n=0;n<60;n++){try{const r=await fetch(url);if(r.ok)return;}catch{}await new Promise(r=>setTimeout(r,100));}throw new Error('Server did not start: '+logs);}
+async function visible(page,selector){await page.locator(selector).first().waitFor({state:'visible'});}
+async function goView(page,view){await page.locator(`.nav [data-view="${view}"]`).click();}
+const header='问题编号,问题内容,负责人,完成状态,提出日期,解决方案,优先级,功能分类,衡量标签,版本,解决日期\n';
+const data=header+'001,战斗反馈改善,策划甲,未解决,2026-09-01,,高,战斗,乐趣性,,\n002,任务指引,策划乙,已解决,2026-09-02,已增加提示,中,任务,目标感,,2026-09-05\n003,<img src=x onerror=alert(1)>,策划甲,待验证,2026-09-28,验证中,中,引导,成长感,,\n';
+async function upload(page,content,name='issues.csv'){
+  await page.locator('#file').setInputFiles({name,mimeType:'text/csv',buffer:Buffer.from(content)});
+  await visible(page,'#mapping-form');
+  await page.getByRole('button',{name:'预览数据变更 →'}).click();
+  await visible(page,'[data-action="commit"]');
+}
+async function create(page,name){
+  await page.locator('.new-project').click();
+  await page.locator('#dialog #name').fill(name);
+  await page.locator('#dialog #startDate').fill('2026-09-01');
+  await page.locator('#dialog #versions').fill('v1.0,2026-09-01\nv2.0,2026-09-20');
+  await page.getByRole('button',{name:'创建工作台',exact:true}).click();
+  await visible(page,'#file');
+}
+async function main(){
+  const build=spawnSync(python,['platform/build_static.py','--output',path.join(temporary,'web','project-workbench'),'--repository','example/workbench'],{cwd:root,encoding:'utf8',windowsHide:true});
+  assert.equal(build.status,0,build.stderr);
+  start(['platform/server.py'],{WORKBENCH_DATA:path.join(temporary,'data'),WORKBENCH_ADMIN_KEY:key,WORKBENCH_PORT:String(backendPort),WORKBENCH_HOST:'127.0.0.1'});
+  start(['-m','http.server',String(staticPort),'--bind','127.0.0.1','--directory',path.join(temporary,'web')]);
+  await Promise.all([ready(`http://127.0.0.1:${backendPort}/healthz`),ready(`http://127.0.0.1:${staticPort}/project-workbench/`)]);
+  browser=await chromium.launch({headless:true,...(process.env.BROWSER_EXECUTABLE?{executablePath:process.env.BROWSER_EXECUTABLE}:{})});
+  const context=await browser.newContext({viewport:{width:1440,height:1100},acceptDownloads:true});
+  const page=await context.newPage();
+  const errors=[];page.on('pageerror',e=>errors.push(e.message));
+  await page.goto(`http://127.0.0.1:${backendPort}/`);
+  await page.locator('#key').fill(key);
+  await page.getByRole('button',{name:'进入工作台 →'}).click();
+  await visible(page,'.new-project');
+  await create(page,'浏览器验收项目');
+  await upload(page,header+'001,坏数据,甲,未知状态,2026-99-99,,高,战斗,乐趣性,,\n');
+  assert.equal(await page.locator('[data-action="commit"]').isDisabled(),true);
+  await page.getByRole('button',{name:'重新上传',exact:true}).click();
+  await upload(page,data);
+  await page.locator('[data-action="commit"]').click();
+  await visible(page,'#file');
+  await goView(page,'overview');
+  assert.equal(await page.locator('.metric strong').first().innerText(),'3');
+  assert.equal(await page.locator('img[src="x"]').count(),0);
+  await page.screenshot({path:path.join(output,'server-overview.png'),fullPage:true});
+  await goView(page,'issues');
+  await page.locator('[data-filter="status"]').selectOption('已解决');
+  assert.equal(await page.locator('#issue-results tbody tr').count(),1);
+  await page.locator('[data-item="002"]').click();
+  await visible(page,'dialog[open]');
+  assert.ok((await page.locator('dialog').innerText()).includes('已增加提示'));
+  await page.locator('[data-action="close-dialog"]').click();
+  await goView(page,'weekly');
+  await page.locator('[data-week]').first().click();
+  await page.locator('dialog [data-item]').first().click();
+  await page.locator('[data-action="close-dialog"]').click();
+  await goView(page,'imports');
+  await upload(page,data.replace('001,战斗反馈改善,策划甲,未解决','001,战斗反馈改善,策划甲,进行中'));
+  assert.ok((await page.locator('.import-summary').innerText()).includes('1更新'));
+  await page.locator('[data-action="commit"]').click();
+  await visible(page,'#file');
+  await goView(page,'settings');
+  await page.getByRole('button',{name:'生成只读链接',exact:true}).click();
+  await visible(page,'.integration-code');
+  const share=await page.locator('.integration-code').first().inputValue();
+  const reader=await browser.newContext();const shared=await reader.newPage();
+  shared.on('pageerror',e=>errors.push(e.message));
+  await shared.goto(share);await visible(shared,'.metrics');
+  assert.equal(await shared.locator('[data-view="imports"]').count(),0);
+  assert.equal(await shared.locator('.metric strong').first().innerText(),'3');
+  await page.getByRole('button',{name:'撤销分享',exact:true}).click();
+  await page.getByRole('button',{name:'生成只读链接',exact:true}).waitFor();
+  await shared.reload();await shared.getByRole('heading',{name:'无法打开工作台'}).waitFor();
+  await reader.close();
+  await create(page,'隔离的第二个项目');
+  await goView(page,'overview');
+  assert.equal(await page.locator('.metric strong').first().innerText(),'0');
+  // Static build under a project subpath, without any backend API.
+  const staticPage=await context.newPage();
+  staticPage.on('pageerror',e=>errors.push(e.message));
+  const apiRequests=[];staticPage.on('request',r=>{if(new URL(r.url()).pathname.startsWith('/api/'))apiRequests.push(r.url());});
+  await staticPage.goto(`http://127.0.0.1:${staticPort}/project-workbench/`);
+  await visible(staticPage,'.metrics');
+  assert.equal(await staticPage.locator('.metric strong').first().innerText(),'8');
+  assert.equal(await staticPage.locator('[data-view="imports"]').count(),0);
+  await staticPage.screenshot({path:path.join(output,'static-overview.png'),fullPage:true});
+  await goView(staticPage,'issues');
+  await staticPage.locator('#search').fill('组队');
+  assert.ok(await staticPage.locator('#issue-results tbody tr').count()>=1);
+  await goView(staticPage,'source');
+  await staticPage.locator('.new-project').click();
+  await staticPage.locator('#dialog #name').fill('新项目');
+  const downloadPromise=staticPage.waitForEvent('download');
+  await staticPage.getByRole('button',{name:'下载 project.json',exact:true}).click();
+  const download=await downloadPromise;
+  assert.equal(download.suggestedFilename(),'project.json');
+  await download.saveAs(path.join(output,'downloaded-project.json'));
+  const config=JSON.parse(fs.readFileSync(path.join(output,'downloaded-project.json'),'utf8'));
+  assert.equal(config.name,'新项目');assert.equal(config.file,'issues.csv');
+  await goView(staticPage,'overview');
+  await staticPage.setViewportSize({width:390,height:844});
+  await staticPage.locator('#toast.visible').waitFor({state:'hidden'});
+  await staticPage.screenshot({path:path.join(output,'static-mobile.png'),fullPage:true});
+  assert.equal(await staticPage.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,'Mobile page overflows');
+  assert.deepEqual(apiRequests,[],'Static mode must not call backend API');
+  assert.deepEqual(errors,[],'Browser runtime errors');
+  console.log('PASS: browser import/validation/update, filtering, nested details, share/revoke, project isolation, static subpath, configuration download, mobile layout; no runtime errors.');
+}
+main().catch(async e=>{console.error(e);console.error(logs);if(browser){for(const context of browser.contexts()){for(const p of context.pages()){await p.screenshot({path:path.join(output,'failure-'+Date.now()+'.png'),fullPage:true}).catch(()=>{});}}}process.exitCode=1;}).finally(async()=>{if(browser)await browser.close();for(const child of subprocesses)child.kill();});
