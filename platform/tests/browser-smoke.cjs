@@ -29,7 +29,7 @@ async function upload(page,content,name='issues.csv'){
   await visible(page,'[data-action="commit"]');
 }
 async function create(page,name){
-  await page.locator('.new-project').click();
+  await page.locator('.sidebar [data-action="new-project"]').click();
   await page.locator('#dialog #name').fill(name);
   await page.locator('#dialog #startDate').fill('2026-09-01');
   await page.locator('#dialog #versions').fill('v1.0,2026-09-01\nv2.0,2026-09-20');
@@ -98,6 +98,8 @@ async function main(){
   staticPage.on('pageerror',e=>errors.push(e.message));
   const apiRequests=[];staticPage.on('request',r=>{if(new URL(r.url()).pathname.startsWith('/api/'))apiRequests.push(r.url());});
   await staticPage.goto(`http://127.0.0.1:${staticPort}/project-workbench/`);
+  await visible(staticPage,'.dimension-grid');
+  await staticPage.locator('#project-select').selectOption('demo');
   await visible(staticPage,'.metrics');
   assert.equal(await staticPage.locator('.metric strong').first().innerText(),'8');
   assert.equal(await staticPage.locator('[data-view="imports"]').count(),0);
@@ -106,7 +108,7 @@ async function main(){
   await staticPage.locator('#search').fill('组队');
   assert.ok(await staticPage.locator('#issue-results tbody tr').count()>=1);
   await goView(staticPage,'source');
-  await staticPage.locator('.new-project').click();
+  await staticPage.locator('.sidebar [data-action="new-project"]').click();
   await staticPage.locator('#dialog #name').fill('新项目');
   const downloadPromise=staticPage.waitForEvent('download');
   await staticPage.getByRole('button',{name:'下载 project.json',exact:true}).click();
@@ -120,8 +122,45 @@ async function main(){
   await staticPage.locator('#toast.visible').waitFor({state:'hidden'});
   await staticPage.screenshot({path:path.join(output,'static-mobile.png'),fullPage:true});
   assert.equal(await staticPage.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,'Mobile page overflows');
+  // IPD report: raw metrics, null vs zero, cases, evidence, local JSON preview.
+  await staticPage.setViewportSize({width:1440,height:1100});
+  await staticPage.locator('#project-select').selectOption('ipd-demo');
+  await visible(staticPage,'.dimension-grid');
+  assert.equal(await staticPage.locator('.dimension-card').count(),6);
+  assert.ok((await staticPage.locator('.dimension-card').nth(1).innerText()).includes('0 分'));
+  assert.ok((await staticPage.locator('.dimension-card').nth(2).innerText()).includes('报告未提供定量指标'));
+  await staticPage.locator('[data-dimension="goals"]').first().click();
+  assert.equal(await staticPage.locator('.case-card').count(),1);
+  await staticPage.locator('.case-links [data-item="DEV-001"]').click();
+  await visible(staticPage,'dialog[open]');
+  assert.ok((await staticPage.locator('dialog').innerText()).includes('增加开放倒计时'));
+  await staticPage.locator('dialog [data-evidence]').click();
+  assert.ok((await staticPage.locator('dialog').innerText()).includes('问题表 / DEV-001'));
+  await staticPage.locator('[data-action="close-dialog"]').click();
+  await staticPage.locator('[data-dimension=""]').click();
+  await staticPage.evaluate(()=>scrollTo(0,0));
+  await staticPage.screenshot({path:path.join(output,'ipd-report.png'),fullPage:false});
+  const report=JSON.parse(fs.readFileSync(path.join(root,'projects/ipd-demo/report.json'),'utf8'));
+  const invalid=structuredClone(report);invalid.cases[0].issueIds=['MISSING'];
+  await staticPage.locator('#report-file').setInputFiles({name:'invalid.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(invalid))});
+  await staticPage.getByRole('heading',{name:'报告校验未通过'}).waitFor();
+  assert.equal(await staticPage.locator('.dimension-card').count(),6);
+  await staticPage.locator('[data-action="close-dialog"]').click();
+  report.project.name='浏览器本地 JSON 预览';
+  await staticPage.locator('#report-file').setInputFiles({name:'report.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(report))});
+  await staticPage.getByText('当前是本地 JSON 预览，未上传或保存。刷新网页会退出预览。',{exact:false}).waitFor();
+  assert.equal(await staticPage.locator('.dimension-card').count(),6);
+  await goView(staticPage,'source');
+  assert.ok((await staticPage.locator('.content').innerText()).includes('report.json'));
+  await goView(staticPage,'report');
+  await staticPage.setViewportSize({width:390,height:844});
+  await staticPage.locator('#toast.visible').waitFor({state:'hidden'});
+  await staticPage.screenshot({path:path.join(output,'ipd-mobile.png'),fullPage:true});
+  assert.equal(await staticPage.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,'IPD mobile overflows');
+  await staticPage.getByRole('button',{name:'退出预览',exact:true}).click();
+  await visible(staticPage,'#project-select');
   assert.deepEqual(apiRequests,[],'Static mode must not call backend API');
   assert.deepEqual(errors,[],'Browser runtime errors');
-  console.log('PASS: browser import/validation/update, filtering, nested details, share/revoke, project isolation, static subpath, configuration download, mobile layout; no runtime errors.');
+  console.log('PASS: browser import/validation/update, filtering, nested details, share/revoke, project isolation, static subpath, configuration download, mobile layout, IPD report metrics/cases/evidence, invalid JSON and local preview; no runtime errors.');
 }
 main().catch(async e=>{console.error(e);console.error(logs);if(browser){for(const context of browser.contexts()){for(const p of context.pages()){await p.screenshot({path:path.join(output,'failure-'+Date.now()+'.png'),fullPage:true}).catch(()=>{});}}}process.exitCode=1;}).finally(async()=>{if(browser)await browser.close();for(const child of subprocesses)child.kill();});

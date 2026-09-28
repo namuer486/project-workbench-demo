@@ -3,9 +3,9 @@ name: Build project workbench
 on:
   push:
     branches: [main]
-    paths: ['projects/**', 'platform/**', '.github/workflows/workbench-pages.yml']
+    paths: ['projects/**', 'platform/**', 'skills/ipd-report-json/**', '.github/workflows/workbench-pages.yml']
   pull_request:
-    paths: ['projects/**', 'platform/**', '.github/workflows/workbench-pages.yml']
+    paths: ['projects/**', 'platform/**', 'skills/ipd-report-json/**', '.github/workflows/workbench-pages.yml']
   workflow_dispatch:
 
 permissions:

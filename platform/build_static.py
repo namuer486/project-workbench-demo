@@ -7,6 +7,7 @@ import shutil
 import tempfile
 from pathlib import Path
 
+from ipd import SKILL, contract, report_snapshot
 from server import ALIASES, Error, ROOT, Store, dumps, normalize, now, parse_table, validate_config
 
 
@@ -17,7 +18,7 @@ def build(source, output, repository="", ref="main"):
     # Never clear an existing destination: failed validation must preserve the last good build.
     if output.exists() and any(output.iterdir()):
         raise Error("输出目录必须为空，请使用新的构建目录")
-    configs = sorted(source.glob("*/project.json"))
+    configs = sorted([*source.glob("*/project.json"), *source.glob("*/report.json")])
     if not configs:
         raise Error("没有项目配置，请在 projects/<项目代号>/project.json 中配置项目")
     built = []
@@ -26,6 +27,18 @@ def build(source, output, repository="", ref="main"):
         slug = config_path.parent.name
         if not re.fullmatch(r"[a-z0-9][a-z0-9_-]{0,63}", slug):
             raise Error("项目目录名只能使用小写英文、数字、下划线和短横线，最多 64 字符")
+        if (config_path.parent / "report.json").exists() and (config_path.parent / "project.json").exists():
+            raise Error(f"{slug}: report.json 和 project.json 只能选择一种数据来源")
+        if config_path.name == "report.json":
+            if config_path.stat().st_size > 10 * 1024 * 1024:
+                raise Error(f"{slug}: 报告 JSON 不能超过 10 MB")
+            report = contract.load_json(config_path)
+            snapshot = report_snapshot(report, timestamp)
+            if report["project"]["id"] != slug:
+                raise Error(f"{slug}: 文件夹名必须与 report.project.id 一致")
+            snapshot["build"] = {"generatedAt": timestamp, "commit": os.environ.get("GITHUB_SHA", ""), "mode": "static"}
+            built.append((slug, snapshot))
+            continue
         payload = json.loads(config_path.read_text(encoding="utf-8-sig"))
         config = validate_config(payload)
         filename = payload.get("file", "issues.csv")
@@ -58,17 +71,18 @@ def build(source, output, repository="", ref="main"):
         built.append((slug, snapshot))
     output.mkdir(parents=True, exist_ok=True)
     (output / "data").mkdir(exist_ok=True)
-    for asset in ("app.js", "style.css"):
+    for asset in ("app.js", "style.css", "report.js"):
         shutil.copyfile(ROOT / "static" / asset, output / asset)
+    shutil.copyfile(SKILL / "references" / "report.schema.json", output / "report.schema.json")
     html = (ROOT / "static" / "index.html").read_text(encoding="utf-8")
     html = html.replace('<meta charset="utf-8">', '<meta charset="utf-8">\n  <meta name="workbench-mode" content="static">\n  <meta name="referrer" content="no-referrer">')
-    html = html.replace('href="/style.css"', 'href="./style.css"').replace('src="/app.js"', 'src="./app.js"')
+    html = html.replace('href="/style.css"', 'href="./style.css"').replace('src="/app.js"', 'src="./app.js"').replace('src="/report.js"', 'src="./report.js"')
     (output / "index.html").write_text(html, encoding="utf-8")
     (output / ".nojekyll").write_text("", encoding="utf-8")
     manifest = {"projects": [], "generatedAt": timestamp, "repository": repository, "ref": ref}
     for slug, snapshot in built:
         (output / "data" / f"{slug}.json").write_text(dumps(snapshot), encoding="utf-8")
-        manifest["projects"].append({"id": slug, "name": snapshot["project"]["name"], "count": len(snapshot["items"])})
+        manifest["projects"].append({"id": slug, "name": snapshot["project"]["name"], "count": len(snapshot["items"]), "hasReport": bool(snapshot.get("report"))})
     (output / "data" / "manifest.json").write_text(dumps(manifest), encoding="utf-8")
     return manifest
 

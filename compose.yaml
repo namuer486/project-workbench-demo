@@ -1,6 +1,8 @@
 services:
   workbench:
-    build: ./platform
+    build:
+      context: .
+      dockerfile: platform/Dockerfile
     ports:
       - "127.0.0.1:8765:8765"
     volumes:
