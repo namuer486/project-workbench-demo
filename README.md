@@ -1,21 +1,3 @@
-# 项目工作台平台版
-
-- **本机部署**：[部署与使用说明](docs/本机部署.md)。双击“启动工作台.cmd”，免登录导入 JSON，保存后生成项目；支持后台保活和当前用户登录自启。
-
-当前开发方向：**IPD 研究报告 + 开发问题 → GPT 使用 Skill 生成 report.json → 项目级问题与通用性提炼 → 公司内部静态部署。**
-
-- [项目拆解 JSON 工作流](docs/IPD报告JSON工作流.md)：v2 三层结构、GPT 调用示例、依据追溯与导入；兼容旧版 JSON。
-- [ipd-report-json Skill](skills/ipd-report-json/SKILL.md)：可复制给其他成员使用；纯 Python 校验器无需额外依赖。
-- Windows 本地查看：双击 `预览静态工作台.cmd`（需要 Python 3.11+；首次安装依赖需要网络）。
-- [静态工作台部署与更新说明](docs/静态工作台部署.md)：推荐路径，GitHub Actions 自动校验 Excel/CSV 并生成静态网站。
-- [可选服务器模式](platform/README.md)：需要网页导入预览、数据库和批次记录时使用。
-- `projects/demo/`：合成演示数据；`platform/static/`：统一看板；`platform/build_static.py`：静态构建器。
-- Pages 自动发布默认关闭，仓库私有不等于站点私有；确定公司访问控制后再启用托管。
-
-下方为原始静态示例说明，`workbench/` 和原说明书保留作为参考。
-
----
-
 # 星港计划 项目知识管理工作台（示例仓库）
 
 > ⚠️ 本仓库为**示例 / 临时数据**版本，用于演示「项目知识管理工作台」的结构与能力。

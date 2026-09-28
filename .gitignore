@@ -13,15 +13,3 @@ desktop.ini
 # 构建中转
 __pycache__/
 *.log
-
-# Platform runtime state and local credentials
-.env
-platform/.venv/
-platform/data/
-platform/.test-data/
-test-results/
-
-# Static build artifacts
-_site/
-_site-*/
-!projects/**/*.xlsx
