@@ -41,7 +41,7 @@ async function boot(){
     return;
   }
   try{
-    const session=await api('/api/session'); state.fields=session.fields; state.defaultTags=session.defaultTags;state.requireLogin=session.requireLogin;
+    const session=await api('/api/session'); state.fields=session.fields; state.defaultTags=session.defaultTags;state.requireLogin=session.requireLogin;state.canOpenSkill=session.canOpenSkill;state.skillPath=session.skillPath;
     await loadProjects();
   }catch(e){loginPage(); if(e.message!=='请先登录') notify(e.message,true);}
 }
@@ -61,7 +61,7 @@ function render(){
   if(canEditProblems())available.splice(1,0,['submit','✎','项目问题提交']);
   if(state.report){const timelineNav=available.find(n=>n[0]==='timeline');if(timelineNav)available[available.indexOf(timelineNav)]=['timeline','◷','项目问题时间轴'];}
   const title=available.find(n=>n[0]===state.view)?.[2]||'项目概览';
-  $('#app').innerHTML=`<div class="shell"><aside class="sidebar"><div class="brand"><span class="logo">◫</span>项目工作台</div><label for="project-select">当前项目 / PROJECT</label>${state.share||state.localReport?`<div class="project-name">${esc(p.name)}</div>`:`<select id="project-select" aria-label="切换项目"><option value="" ${p?'hidden':''}>选择项目</option>${state.projects.map(v=>`<option value="${v.id}" ${v.id===p?.id?'selected':''}>${esc(v.name)}</option>`).join('')}</select><button class="new-project" data-action="new-project">＋ ${state.static?'生成项目配置':'创建项目'}</button>`}<button class="new-project report-import-button" data-action="load-report">导入项目 JSON</button><input id="report-file" type="file" accept=".json" hidden><nav class="nav" aria-label="主导航">${available.map(([id,icon,name])=>`<button data-view="${id}" class="${state.view===id?'active':''}" ${p?'':'disabled'}><span class="nav-icon">${icon}</span>${name}</button>`).join('')}</nav><div class="sidebar-foot"><i class="dot"></i> ${readonly()?'项目只读视图':'表格维护 · 看板同步'}<p class="small">每一项进展，都有数据依据</p></div></aside><main class="main"><header class="topbar"><div class="crumb">工作空间 &nbsp;/&nbsp; <b>${esc(p?.name||'欢迎使用')}</b> &nbsp;/&nbsp; ${title}</div><div class="topbar-right"><span class="small muted">${readonly()?'只读看板':'项目管理员'}</span><span class="avatar">${readonly()?'阅':'管'}</span>${!readonly()&&state.requireLogin!==false?'<button class="subtle small" data-action="logout">退出</button>':''}</div></header>${state.localReport?reportSaveBanner():state.static?'<div class="share-head">仓库数据看板 · 更新源表并提交到仓库，构建成功后刷新即可查看。</div>':state.share?'<div class="share-head">只读项目看板 · 数据由项目管理员从源表导入，点击刷新可查看最新已导入数据。</div>':''}<div class="content">${p?viewContent():empty('开通第一个项目工作台','导入 GPT 生成的项目 JSON，或创建表格项目后上传问题清单。','<button class="primary" data-action="load-report">导入 JSON 生成项目</button> <button data-action="new-project">创建表格项目</button>')}</div></main></div>`;
+  $('#app').innerHTML=`<div class="shell"><aside class="sidebar"><div class="brand"><span class="logo">◫</span>项目工作台</div><label for="project-select">当前项目 / PROJECT</label>${state.share||state.localReport?`<div class="project-name">${esc(p.name)}</div>`:`<select id="project-select" aria-label="切换项目"><option value="" ${p?'hidden':''}>选择项目</option>${state.projects.map(v=>`<option value="${v.id}" ${v.id===p?.id?'selected':''}>${esc(v.name)}</option>`).join('')}</select><button class="new-project" data-action="new-project">＋ ${state.static?'生成项目配置':'创建项目'}</button>`}<button class="new-project report-import-button" data-action="load-report">导入项目 JSON</button><input id="report-file" type="file" accept=".json" hidden>${skillTools()}<nav class="nav" aria-label="主导航">${available.map(([id,icon,name])=>`<button data-view="${id}" class="${state.view===id?'active':''}" ${p?'':'disabled'}><span class="nav-icon">${icon}</span>${name}</button>`).join('')}</nav><div class="sidebar-foot"><i class="dot"></i> ${readonly()?'项目只读视图':'表格维护 · 看板同步'}<p class="small">每一项进展，都有数据依据</p></div></aside><main class="main"><header class="topbar"><div class="crumb">工作空间 &nbsp;/&nbsp; <b>${esc(p?.name||'欢迎使用')}</b> &nbsp;/&nbsp; ${title}</div><div class="topbar-right"><span class="small muted">${readonly()?'只读看板':'项目管理员'}</span><span class="avatar">${readonly()?'阅':'管'}</span>${!readonly()&&state.requireLogin!==false?'<button class="subtle small" data-action="logout">退出</button>':''}</div></header>${state.localReport?reportSaveBanner():state.static?'<div class="share-head">仓库数据看板 · 更新源表并提交到仓库，构建成功后刷新即可查看。</div>':state.share?'<div class="share-head">只读项目看板 · 数据由项目管理员从源表导入，点击刷新可查看最新已导入数据。</div>':''}<div class="content">${p?viewContent():empty('开通第一个项目工作台','导入 GPT 生成的项目 JSON，或创建表格项目后上传问题清单。','<button class="primary" data-action="load-report">导入 JSON 生成项目</button> <button data-action="new-project">创建表格项目</button>')}</div></main></div>`;
 }
 function pageHead(title,desc,actions=''){return `<div class="page-head"><div><div class="eyebrow">PROJECT WORKBENCH</div><h1>${title}</h1><p>${desc}</p></div><div class="actions">${actions}</div></div>`;}
 function viewContent(){return ({report:reportView,submit:problemSubmitView,overview:overview,issues:issuesView,timeline:timeline,weekly:weekly,imports:importsView,settings:settingsView,source:sourceView}[state.view]||overview)();}
@@ -104,7 +104,14 @@ async function uploadFile(file,sheet){
   const bytes=new Uint8Array(await file.arrayBuffer());let binary='';for(let i=0;i<bytes.length;i+=32768)binary+=String.fromCharCode(...bytes.subarray(i,i+32768));
   state.upload=await api(endpoint('upload'),{filename:file.name,content:btoa(binary),sheet});state.file=file;state.preview=null;render();
 }
+function skillTools(){
+  if(state.share)return '';
+  const local=!state.static&&state.canOpenSkill;
+  return `<div class="skill-tools"><a class="new-project" href="${state.static?'./ipd-report-json.zip':'/api/skill/download'}" download="ipd-report-json.zip">↓ 下载 Skill</a><button class="new-project" data-action="open-skill" ${local?'':'disabled'} title="${esc(local?state.skillPath:'在部署电脑上访问工作台可打开目录；其他电脑请下载 Skill 后使用。')}">打开 Skill 位置</button><p>完整包含说明、格式规范与校验脚本</p></div>`;
+}
 async function act(action,button){
+  if(action==='open-skill'){const result=await api('/api/skill/open',{});notify('已打开 Skill 文件夹：'+result.path);return;}
+
   if(['new-project','load-report','refresh','logout'].includes(action)&&!discardProblemDraft())return;
   if(action==='reset-problem'){if(discardProblemDraft())render();return;}
   if(action==='confirm-delete-problem'){

@@ -5,6 +5,8 @@ import sys
 import tempfile
 import threading
 import unittest
+import zipfile
+from unittest.mock import patch
 import urllib.error
 import urllib.request
 from datetime import datetime
@@ -323,6 +325,35 @@ class HttpTests(unittest.TestCase):
             urllib.request.urlopen(req)
         self.assertEqual(error.exception.code,403)
         self.assertEqual(self.request("/api/projects", CONFIG, origin="https://public.example", authenticated=False)[0],403)
+
+    def test_skill_download_and_local_folder_open(self):
+        from ipd import SKILL
+        self.assertEqual(self.request('/api/skill/download')[0],401)
+        self.login()
+        req = urllib.request.Request(self.base + '/api/skill/download', headers={'Cookie':self.cookie})
+        with urllib.request.urlopen(req) as response:
+            self.assertEqual(response.headers['Content-Type'],'application/zip')
+            self.assertIn('ipd-report-json.zip',response.headers['Content-Disposition'])
+            raw=response.read()
+        with zipfile.ZipFile(io.BytesIO(raw)) as archive:
+            for name in ('SKILL.md','references/project.schema.json','scripts/validate.py'):
+                self.assertEqual(archive.read('ipd-report-json/'+name),(SKILL/name).read_bytes())
+            self.assertIn('安装',archive.read('ipd-report-json/使用说明.txt').decode('utf-8'))
+            self.assertTrue(all('__pycache__' not in n and not n.endswith('.sqlite3') for n in archive.namelist()))
+        with patch('server.open_skill_folder') as opened:
+            self.assertEqual(self.request('/api/skill/open',{},authenticated=False)[0],401)
+            self.assertEqual(self.request('/api/skill/open',{},origin='https://unrelated.example')[0],403)
+            self.assertEqual(self.request('/api/skill/open',{'path':'C:/Windows'})[0],400)
+            self.assertEqual(self.request('/api/skill/open',{})[0],200)
+            opened.assert_called_once_with()
+        with patch('server.open_skill_folder',side_effect=OSError('not available')):
+            self.assertEqual(self.request('/api/skill/open',{})[0],503)
+        req=urllib.request.Request(self.base+'/api/skill/open',data=b'{}',headers={'Cookie':self.cookie,'Content-Type':'application/json','Host':'remote.example'})
+        with patch('server.open_skill_folder') as opened:
+            with self.assertRaises(urllib.error.HTTPError) as error:
+                urllib.request.urlopen(req)
+            self.assertEqual(error.exception.code,403)
+            opened.assert_not_called()
 
     def test_online_problem_lifecycle_and_export(self):
         from ipd import contract

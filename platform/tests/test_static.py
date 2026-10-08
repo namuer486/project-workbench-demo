@@ -2,6 +2,7 @@ import json
 import sys
 import tempfile
 import unittest
+import zipfile
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -34,7 +35,13 @@ class StaticBuildTests(unittest.TestCase):
         self.assertIn('src="./app.js"', html)
         self.assertIn('name="workbench-mode" content="static"', html)
         files = {p.name for p in self.output.rglob("*") if p.is_file()}
-        self.assertEqual(files, {"index.html", "app.js", "style.css", ".nojekyll", "manifest.json", "alpha.json", "report.js", "report.schema.json", "project.schema.json"})
+        self.assertEqual(files, {"index.html", "app.js", "style.css", ".nojekyll", "manifest.json", "alpha.json", "report.js", "report.schema.json", "project.schema.json", "ipd-report-json.zip"})
+        with zipfile.ZipFile(self.output / "ipd-report-json.zip") as archive:
+            self.assertIn("ipd-report-json/SKILL.md", archive.namelist())
+            self.assertIn("ipd-report-json/references/project.schema.json", archive.namelist())
+            self.assertIn("ipd-report-json/scripts/validate.py", archive.namelist())
+            self.assertIn("ipd-report-json/使用说明.txt", archive.namelist())
+            self.assertTrue(all(name.startswith("ipd-report-json/") and ".." not in name for name in archive.namelist()))
         data = json.loads((self.output / "data" / "alpha.json").read_text(encoding="utf-8"))
         self.assertEqual(data["items"][0]["id"], "001")
         self.assertNotIn("mapping", data["project"])

@@ -22,6 +22,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 from ipd import contract, report_snapshot
+from skill_package import SKILL, can_open_skill_folder, open_skill_folder, skill_archive
 
 ROOT = Path(__file__).resolve().parent
 DEFAULT_TAGS = ["新鲜感", "目标感", "成长感", "乐趣性", "社交感", "时间成本"]
@@ -552,10 +553,12 @@ def handler_for(app):
         def log_message(self, *_args):
             pass  # Do not log credentials or project share URLs.
 
-        def reply(self, value, status=200, cookie=None, content_type="application/json; charset=utf-8"):
+        def reply(self, value, status=200, cookie=None, content_type="application/json; charset=utf-8", headers=None):
             raw = value if isinstance(value, bytes) else dumps(value).encode()
             self.send_response(status)
             self.send_header("Content-Type", content_type)
+            for key, val in (headers or {}).items():
+                self.send_header(key, val)
             self.send_header("Content-Length", str(len(raw)))
             self.send_header("Cache-Control", "no-store")
             self.send_header("X-Content-Type-Options", "nosniff")
@@ -671,7 +674,28 @@ def handler_for(app):
                     return self.reply({"ok": True}, cookie=cookie)
             session = self.authorized()
             if method == "GET" and path == "/api/session":
-                return self.reply({"ok": True, "fields": FIELDS, "defaultTags": DEFAULT_TAGS, "requireLogin": app.require_login})
+                try:
+                    self.local_request()
+                    local = True
+                except Error:
+                    local = False
+                return self.reply({"ok": True, "fields": FIELDS, "defaultTags": DEFAULT_TAGS, "requireLogin": app.require_login,
+                                   "canOpenSkill": local and can_open_skill_folder(), "skillPath": str(SKILL.resolve()) if local else None})
+            if method == "GET" and path == "/api/skill/download":
+                try:
+                    archive = skill_archive()
+                except (ValueError, OSError) as exc:
+                    raise Error("无法打包 Skill：" + str(exc), 503) from exc
+                return self.reply(archive, content_type="application/zip", headers={"Content-Disposition": 'attachment; filename="ipd-report-json.zip"'})
+            if method == "POST" and path == "/api/skill/open":
+                self.local_request()
+                if body:
+                    raise Error("此操作仅打开工作台自带 Skill 目录，无需传入路径")
+                try:
+                    open_skill_folder()
+                except OSError as exc:
+                    raise Error("无法打开 Skill 目录，请下载压缩包使用", 503) from exc
+                return self.reply({"ok": True, "path": str(SKILL.resolve())})
             if method == "POST" and path == "/api/reports/preview":
                 preview = app.store.preview_report(body.get("report"))
                 token = app.cache(app.previews, preview)

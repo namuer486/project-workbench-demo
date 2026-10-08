@@ -9,6 +9,7 @@ from pathlib import Path
 
 from ipd import SKILL, contract, report_snapshot
 from server import ALIASES, Error, ROOT, Store, dumps, normalize, now, parse_table, validate_config
+from skill_package import skill_archive
 
 
 def build(source, output, repository="", ref="main"):
@@ -69,7 +70,9 @@ def build(source, output, repository="", ref="main"):
         snapshot["history"] = []
         snapshot["build"] = {"generatedAt": timestamp, "commit": os.environ.get("GITHUB_SHA", ""), "mode": "static"}
         built.append((slug, snapshot))
+    archive = skill_archive()
     output.mkdir(parents=True, exist_ok=True)
+    (output / "ipd-report-json.zip").write_bytes(archive)
     (output / "data").mkdir(exist_ok=True)
     for asset in ("app.js", "style.css", "report.js"):
         shutil.copyfile(ROOT / "static" / asset, output / asset)

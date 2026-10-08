@@ -50,6 +50,20 @@ async function main(){
   await page.locator('#key').fill(key);
   await page.getByRole('button',{name:'进入工作台 →'}).click();
   await visible(page,'.new-project');
+  const skillDownload=page.waitForEvent('download');
+  await page.locator('.skill-tools a').click();
+  const packageDownload=await skillDownload;
+  assert.equal(packageDownload.suggestedFilename(),'ipd-report-json.zip');
+  assert.equal(fs.readFileSync(await packageDownload.path()).subarray(0,2).toString(),'PK');
+  // Mock the OS side effect while checking the button dispatches the correct request.
+  await page.route('**/api/skill/open',async route=>{
+    assert.equal(route.request().method(),'POST');
+    assert.deepEqual(route.request().postDataJSON(),{});
+    await route.fulfill({json:{ok:true,path:'test/skills/ipd-report-json'}});
+  });
+  await page.locator('[data-action="open-skill"]').click();
+  await page.getByText('已打开 Skill 文件夹：test/skills/ipd-report-json',{exact:true}).waitFor();
+  await page.unroute('**/api/skill/open');
   await create(page,'浏览器验收项目');
   await upload(page,header+'001,坏数据,甲,未知状态,2026-99-99,,高,战斗,乐趣性,,\n');
   assert.equal(await page.locator('[data-action="commit"]').isDisabled(),true);
@@ -202,6 +216,12 @@ async function main(){
   const apiRequests=[];staticPage.on('request',r=>{if(new URL(r.url()).pathname.startsWith('/api/'))apiRequests.push(r.url());});
   await staticPage.goto(`http://127.0.0.1:${staticPort}/project-workbench/`);
   await visible(staticPage,'.dimension-grid');
+  assert.equal(await staticPage.locator('[data-action="open-skill"]').isDisabled(),true);
+  const staticSkillDownload=staticPage.waitForEvent('download');
+  await staticPage.locator('.skill-tools a').click();
+  const staticPackage=await staticSkillDownload;
+  assert.equal(staticPackage.suggestedFilename(),'ipd-report-json.zip');
+  assert.equal(fs.readFileSync(await staticPackage.path()).subarray(0,2).toString(),'PK');
   await staticPage.locator('#project-select').selectOption('demo');
   await staticPage.waitForFunction(()=>state.project?.id==='demo'&&!state.busy);
   await visible(staticPage,'.metrics');
